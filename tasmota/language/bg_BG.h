@@ -982,7 +982,6 @@
 #define D_GPIO_MKSKYBLU_TX     "MkSkyBlu Tx"
 #define D_GPIO_MKSKYBLU_RX     "MkSkyBlu Rx"
 
-
 // Units
 #define D_UNIT_AMPERE "А"
 #define D_UNIT_CELSIUS "C"

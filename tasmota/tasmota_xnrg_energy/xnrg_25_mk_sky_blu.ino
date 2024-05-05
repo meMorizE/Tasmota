@@ -49,94 +49,63 @@
 
 #include <TasmotaSerial.h>
 
-#define XNRG_25                   25
+#define XNRG_25                     25
 
 /* compile options */
-#define _VARIANT_ENERGY_IMPORT    2 /* 0=never import, 1=import once, 2=import changed full kWh */
-#define _WITH_CONFIG_REGISTER_SUPPORT
-#define _WITH_ON_OFF_SUPPORT
-#define _WITH_SERIAL_DEBUGGING
-//#define _WITH_PHASE_NAME_SUPPORT /* requires new element Energy->phase_names at xdrv_03_energy and xdrv_03_esp32_energy */
+#define MKSB_VARIANT_ENERGY_IMPORT    2 /* 0=never import, 1=import once, 2=import changed full kWh */
+#define MKSB_WITH_CONFIG_REGISTER_SUPPORT
+#define MKSB_WITH_ON_OFF_SUPPORT
+#define MKSB_WITH_SERIAL_DEBUGGING
+//#define MKSB_WITH_PHASE_NAME_SUPPORT /* requires new element Energy->phase_names at xdrv_03_energy and xdrv_03_esp32_energy */
 
 
-#ifdef _WITH_SERIAL_DEBUGGING
-  #define MKSB_COM_RX_IncrementCnt( cnt )  { me.cntRx[cnt]++; if ( cnt ) me.lastRxCntError = cnt; }
+#ifdef MKSB_WITH_SERIAL_DEBUGGING
+  #define MKSB_COM_RX_IncrementCnt( cnt )  { mksb_cntRx[cnt]++; if ( cnt ) mksb_lastRxCntError = cnt; }
 #else
   #define MKSB_COM_RX_IncrementCnt( cnt )  (void)0
 #endif
 
-#define MKSB_BAUDRATE             9600
-#define MKSB_TIMEOUT              3     // seconds
+#define MKSB_BAUDRATE               9600
+#define MKSB_TIMEOUT                3     // seconds
 
 // first byte of every valid frame
-#define MKSB_START_FRAME          0xAA
-
+#define MKSB_START_FRAME            0xAA
 // second byte: Request to the charge controller
-#define MKSB_CMD_READ_STATUS      0x55
-#define MKSB_CMD_READ_CONFIG      0xCB
-#define MKSB_CMD_WRITE_CONFIG     0xCA
-#define MKSB_CMD_POWER            0xCC
-
+#define MKSB_CMD_READ_STATUS        0x55
+#define MKSB_CMD_READ_CONFIG        0xCB
+#define MKSB_CMD_WRITE_CONFIG       0xCA
+#define MKSB_CMD_POWER              0xCC
 // second byte: Response from the charge controller
-#define MKSB_RSP_READ_STATUS      0xBB
-#define MKSB_RSP_RW_CONFIG        0xDA
-#define MKSB_RSP_POWER            0xDD
+#define MKSB_RSP_READ_STATUS        0xBB
+#define MKSB_RSP_RW_CONFIG          0xDA
+#define MKSB_RSP_POWER              0xDD
 
-#define MKSB_BUFFER_SIZE          24 // bytes
+#define MKSB_BUFFER_SIZE            24 // bytes
 
 // config registers                   
-#define MKSB_REG_SPECIAL          0   //     ?
-#define MKSB_REG_VOLTAGE_BULK     1   // D02 MPPT Voltage limit BULK, >= stops charging [mV], e.g. 55000mV
-#define MKSB_REG_VOLTAGE_FLOAT    2   // D01 MPPT voltage limit FLOAT, <= restarts charging [mV], SLA battery only
-#define MKSB_REG_OUT_TIMER        3   // D00 Time duration the load gets connected [mh], default: 24h = 24000mh
-#define MKSB_REG_CURRENT          4   //  -  MPPT current limit [mA] e.g. 1000...60000mA 
-                                      //     CAUTION: do not set above hardware-limit 30000/40000/50000/60000
-#define MKSB_REG_BATT_UVP_CUT     5   // D03 Battery UnderVoltageProtection, <=limit cuts load [mV], e.g. 42400mV
-#define MKSB_REG_BATT_UVP_CONN    6   //  ~  Battery UnderVoltageProtection, >=limit reconnects load [mV], typical: D03 + 200mV, e.g. 44400mV
-#define MKSB_REG_COMM_ADDR        7   //  -  Communication Address [mAddress]
-#define MKSB_REG_BATT_TYPE        8   // D04 Battery Type: value 0=SLA, 1=LiPo (2=LiLo, 3=LiFE, 4=LiTo) [mSelect], e.g. 1000=LiPo
-#define MKSB_REG_BATT_CELLS       9   //  -  Battery System: 1...4 * 12V (Read-Only, set at Batt.connection) [m12V], e.g. 4000m12V
-#define MKSB_REG_TOTAL            10  // ^^^ related local parameter at HMI
+#define MKSB_REG_SPECIAL            0   //     ?
+#define MKSB_REG_VOLTAGE_BULK       1   // D02 MPPT Voltage limit BULK, >= stops charging [mV], e.g. 55000mV
+#define MKSB_REG_VOLTAGE_FLOAT      2   // D01 MPPT voltage limit FLOAT, <= restarts charging [mV], SLA battery only
+#define MKSB_REG_OUT_TIMER          3   // D00 Time duration the load gets connected [mh], default: 24h = 24000mh
+#define MKSB_REG_CURRENT            4   //  -  MPPT current limit [mA] e.g. 1000...60000mA 
+                                        //     CAUTION: do not set above hardware-limit 30000/40000/50000/60000
+#define MKSB_REG_BATT_UVP_CUT       5   // D03 Battery UnderVoltageProtection, <=limit cuts load [mV], e.g. 42400mV
+#define MKSB_REG_BATT_UVP_CONN      6   //  ~  Battery UnderVoltageProtection, >=limit reconnects load [mV], typical: D03 + 200mV, e.g. 44400mV
+#define MKSB_REG_COMM_ADDR          7   //  -  Communication Address [mAddress]
+#define MKSB_REG_BATT_TYPE          8   // D04 Battery Type: value 0=SLA, 1=LiPo (2=LiLo, 3=LiFE, 4=LiTo) [mSelect], e.g. 1000=LiPo
+#define MKSB_REG_BATT_CELLS         9   //  -  Battery System: 1...4 * 12V (Read-Only, set at Batt.connection) [m12V], e.g. 4000m12V
+#define MKSB_REG_TOTAL              10  // ^^^ related local parameter at HMI
 
+// serial counters
 #define MKSB_COM_RX_GOOD            0
 #define MKSB_COM_ERR_RX_TIMEOUT     1
-#define MKSB_COM_ERR_RX_TOO_SHORT   2
-#define MKSB_COM_ERR_RX_OVERFLOW    3
-#define MKSB_COM_ERR_RX_CRC         4
-#define MKSB_COM_ERR_RX_COMMAND     5
-#define MKSB_COM_ERR_RX_LENGTH      6
-#define MKSB_COM_RX_COUNTER         7
+#define MKSB_COM_ERR_RX_OVERFLOW    2
+#define MKSB_COM_ERR_RX_CRC         3
+#define MKSB_COM_ERR_RX_CMD_LENGTH  4
+#define MKSB_COM_RX_COUNTER         5
 
-typedef struct mksb_data_t_
-{
-  TasmotaSerial *Serial;
-  char *pRxBuffer;
-  unsigned long time_window;            // for Rx silence detection
-  float temperature;                    // temperature of the charge controller electronics
-#ifdef _WITH_SERIAL_DEBUGGING
-  unsigned long cntTx;                  // requests transmitted to the charge controller
-  unsigned long cntRx[MKSB_COM_RX_COUNTER];
-  uint16_t lastRxCntError;
-#endif
-#ifdef _WITH_CONFIG_REGISTER_SUPPORT
-  uint16_t regs_to_read;                // bit_n = flags register n to read
-  uint16_t regs_to_write;               // bit_n = flags register n to write
-  uint16_t regs_to_report;              // bit_n = flags register n to report (after valid response received)
-  uint16_t regs_value[MKSB_REG_TOTAL];  // temp value storage all known configuration registers
-#endif
-  uint16_t energy_for_import;           // totalizer at charge controller (non-volatile there)
-//  uint8_t mode;                         // status: mode flags
-//  uint8_t error;                        // status: error flags
-  uint16_t status;
-  uint8_t rxCnt;                        // bytecounter at the Rx data buffer
-  uint8_t timeout;                      // active after a request, waiting for reponse
-#ifdef _WITH_ON_OFF_SUPPORT
-  bool actual_state;                    // true = active, false = stop
-  bool target_state;                    // true = active, false = stop
-#endif
-} mksb_data_t;
-
-const char * mksb_register_names[] = {
+// module const
+const char * mksb_register_names[] PROGMEM = {
   "0 unknown",                 //     dummy ? 
   "1 MPPT bulk [V]",           // D02 MPPT Voltage limit BULK, >= stops charging
   "2 MPPT float [V]",          // D01 MPPT voltage limit FLOAT, <= restarts charging, SLA battery only
@@ -149,14 +118,52 @@ const char * mksb_register_names[] = {
   "8 Batt.Type [0=SLA, 1=Li]", // D04 Battery Type: value 0=SLA, 1=LiPo (ro)
   "9 Batt.System [n*12V]"      //  -  Battery System: 1...4 * 12V (Read-Only, set at Batt.connection)
 };
+const char MKSB_HTTP_SNS_str_m_int[] PROGMEM = "{s}%s " "{m}" "%d{e}";
+#ifdef MKSB_WITH_PHASE_NAME_SUPPORT
+const char * mksb_channels[] PROGMEM = {D_DEVICE_INPUT , D_BATTERY};
+#endif
+#ifdef MKSB_WITH_SERIAL_DEBUGGING
+const char * mksb_rx_counter_names[] PROGMEM = {
+  "Good",
+  "Timeout",
+  "Overflow",
+  "CRC",
+  "Cmd_Length",
+  "Length"
+};
+#endif
 
-//  const char MKSB_HTTP_SNS_sS_m_De[]       PROGMEM = "{s}%s " "{m}" " %d{e}";
-//  const char MKSB_HTTP_SNS_str_m_str[]       PROGMEM = "{s}%s " "{m}" " %s{e}";
-//  const char MKSB_HTTP_SNS_str_int_str[]        PROGMEM = "{s}%s " "%d{m}" "%s{e}";
-  const char MKSB_HTTP_SNS_str_m_int[]          PROGMEM = "{s}%s " "{m}" "%d{e}";
+// module data
+static TasmotaSerial *mksb_Serial = nullptr;
+static char *mksb_pRxBuffer = nullptr;
+static uint32_t mksb_time_window;            // for Rx silence detection
+static float mksb_temperature;                    // temperature of the charge controller electronics
+#ifdef MKSB_WITH_SERIAL_DEBUGGING
+static uint32_t mksb_cntTx;                  // requests transmitted to the charge controller
+static uint32_t mksb_cntRxBytes;
+static uint32_t mksb_cntRx[MKSB_COM_RX_COUNTER];
+static uint16_t mksb_lastRxCntError;
+#endif
+#ifdef MKSB_WITH_CONFIG_REGISTER_SUPPORT
+static uint16_t mksb_regs_to_read;                // bit_n = flags register n to read
+static uint16_t mksb_regs_to_write;               // bit_n = flags register n to write
+static uint16_t mksb_regs_to_report;              // bit_n = flags register n to report (after valid response received)
+static uint16_t mksb_regs_value[MKSB_REG_TOTAL];  // temp value storage all known configuration registers
+#endif
+static uint16_t mksb_energy_for_import;           // totalizer at charge controller (non-volatile there)
+//  uint8_t mode;                         // status: mode flags
+//  uint8_t error;                        // status: error flags
+static uint16_t mksb_status;
+static uint8_t mksb_rxIdx;                        // bytecounter at the Rx data buffer
+static uint8_t mksb_rxChecksum;
+static uint8_t mksb_timeout;                      // active after a request, waiting for reponse
+#ifdef MKSB_WITH_ON_OFF_SUPPORT
+static bool mksb_actual_state;                    // true = active, false = stop
+static bool mksb_target_state;                    // true = active, false = stop
+#endif
 
 /*
-const char * mksb_status_bits[] = {
+const char * mksb_status_bits[] PROGMEM = {
                                     // mode
   "",                               // b0 
   "",                               // b1
@@ -181,42 +188,11 @@ const char * mksb_status_bits[] = {
 };
 */
 
-#ifdef _WITH_PHASE_NAME_SUPPORT
-const char * mksb_channels[] = {D_DEVICE_INPUT , D_BATTERY};
-#endif
-
-#ifdef _WITH_SERIAL_DEBUGGING
-const char * mksb_rx_counter_names[] = {
-  "Good",
-  "Timeout",
-  "TooShort",
-  "Overflow",
-  "CRC",
-  "Command",
-  "Length"
-};
-#endif
-
-// module data
-mksb_data_t me = { .Serial = nullptr, .pRxBuffer = nullptr }; // singleton
-//mksb_data_t * pMe = nullptr;
-
-
-
-uint8_t MksbChecksum(uint8_t *data, uint8_t len)
+/********************************************************************************************/
+// Extract an unsigned int with size of 1...4 bytes from data stream at offset_lsb 
+uint32_t MkSkyBluExtractUint(const char *data, uint8_t offset_lsb, uint8_t offset_msb)
 {
-  uint8_t checksum = 0;
-  uint32_t i;
-
-  len -= 1;
-  for (i = 1; i < len; i++) { checksum += data[i]; }
-  return checksum;
-}
-
-
-unsigned long MksbExtractUint(char *data, uint8_t offset_lsb, uint8_t offset_msb)
-{
-	unsigned long result = 0;
+	uint32_t result = 0;
 
   for ( ; offset_msb >= offset_lsb; offset_msb-- ) {
     result = (result << 8) | (uint8_t)data[offset_msb];
@@ -224,130 +200,114 @@ unsigned long MksbExtractUint(char *data, uint8_t offset_lsb, uint8_t offset_msb
 	return result;
 }
 
-
-#if 0 // notused
-void MksbSetUint(unsigned long value, uint8_t *data, uint8_t offset_lsb, uint8_t offset_msb)
-{
-    for ( ; offset_lsb <= offset_msb; offset_lsb++ ) {
-      data[offset_lsb] = value & 0xFF;
-      value >>= 8;
-    }
-}
-#endif
-
-
 /********************************************************************************************/
-/* SEND DATA */
-
-bool MksbSend(uint8_t *data, uint8_t len)
+// Send serial data which consists of the variable data stream with its length
+bool MkSkyBluSend(const uint8_t *data, uint8_t len)
 {
   uint32_t i;
+  uint8_t crc;
 
-  if (me.timeout) {
-//    AddLog( LOG_LEVEL_DEBUG, "NRG: Serial Busy, request pending");
-    return false; // transaction busy, a request is already waiting for response
+  // check for busy
+  if (mksb_timeout) {
+    return false; // transaction busy, a request is already waiting for a response
   }
-  me.timeout = MKSB_TIMEOUT;
+  mksb_timeout = MKSB_TIMEOUT;
 
-#ifdef _WITH_SERIAL_DEBUGGING
+  // finish receiver
+  if (MKSB_BUFFER_SIZE <= mksb_rxIdx) { // receive buffer was full
+    MKSB_COM_RX_IncrementCnt(MKSB_COM_ERR_RX_OVERFLOW);
+  }
+  while ( mksb_Serial->available() ) { // clear receive buffer before each new request
+    (void)mksb_Serial->read();
+  }
+  mksb_rxIdx = 0; // reset receiver state
+
+  // build request frame
+  mksb_Serial->write( MKSB_START_FRAME );
+  crc = 0;
+  for ( i = 0; i < len; i++ ) { // variable data
+    mksb_Serial->write(data[i]);
+    crc += data[i];
+  }
+  mksb_Serial->write(crc); // checksum
+
+#ifdef MKSB_WITH_SERIAL_DEBUGGING
   { // serial debug at LOG_LEVEL_DEBUG_MORE: Request bytes transmitted
     char hex_char[(len * 3) + 2];
-    me.cntTx++;
-    AddLog(LOG_LEVEL_DEBUG_MORE, PSTR("NRG: Serial Tx %s"), ToHex_P(data, len, hex_char, sizeof (hex_char), ' '));
+    mksb_cntTx++;
+    AddLog(LOG_LEVEL_DEBUG_MORE, PSTR("NRG: Serial Tx %02X %s %02X"), 
+      MKSB_START_FRAME, 
+      ToHex_P(data, len, hex_char, sizeof (hex_char), ' '),
+      crc );
   }
 #endif
 
-  for ( i = 0; i < len; i++ ) {
-    me.Serial->write(data[i]);
-  }
   return true;
 }
 
 /********************************************************************************************/
 /* COMMAND REQUESTS */
 
-bool MksbRequestStatusData(void)
+/* a) recording of original Wifi-Box firmware: Requested periodical every 1s, response within 30ms */
+bool MkSkyBluRequestStatus(void)
 {
-  uint8_t data[] = {  MKSB_START_FRAME, 
-                      MKSB_CMD_READ_STATUS, 
-                      0, 
-                      0,
-                      0,
-                      0x55 }; // precalculated checksum
-  return MksbSend(data, sizeof (data));
+  static const uint8_t data[] PROGMEM = {  MKSB_CMD_POWER, 0, 2, 0 };
+  return MkSkyBluSend(data, sizeof (data));
 }
 
-bool MksbRequestReadRegister(uint8_t reg)
+/* b) recording of original Wifi-Box firmware: Requested periodical every 1s, 380ms after a), response within 30...370ms */
+bool MkSkyBluRequestMeasurements(void)
 {
-  uint8_t data[] = {  MKSB_START_FRAME, 
-                      MKSB_CMD_READ_CONFIG, 
-                      reg,
-                      0, 0,
-                      0, 
-                      0,
-                      0,
-                      255 }; // placeholder checksum
-  data[sizeof(data)-1] = MksbChecksum(data, sizeof (data));
-  return MksbSend(data, sizeof (data));
+  static const uint8_t data[] PROGMEM = {  MKSB_CMD_READ_STATUS, 0, 0, 0 };
+  return MkSkyBluSend(data, sizeof (data));
 }
 
-bool MksbRequestWriteRegister(uint8_t reg, uint16_t value)
+/* c) recording of original Wifi-Box firmware: Requested on demand with an interval of 170ms, response within 30ms */
+bool MkSkyBluRequestReadRegister(uint8_t reg)
 {
-  uint8_t data[] = {  MKSB_START_FRAME, 
-                      MKSB_CMD_WRITE_CONFIG, 
+  uint8_t data[] = {  MKSB_CMD_READ_CONFIG, 
+                      reg, 
+                      0, 0,  
+                      0,0,0 };
+  return MkSkyBluSend(data, sizeof (data));
+}
+
+bool MkSkyBluRequestWriteRegister(uint8_t reg, uint16_t value)
+{
+  uint8_t data[] = {  MKSB_CMD_WRITE_CONFIG, 
                       reg,
                       (uint8_t)(value & 0xFF), (uint8_t)(value >> 8),
-                      0, 
-                      0,
-                      0,
-                      255 }; // placeholder checksum
-  data[sizeof (data)-1] = MksbChecksum(data, sizeof (data));
-  return MksbSend(data, sizeof (data));
+                      0,0,0 };
+  return MkSkyBluSend(data, sizeof (data));
 }
 
-bool MksbRequestPowerOn(void)
+bool MkSkyBluRequestPowerOn(void)
 {
-  uint8_t data[] = {  MKSB_START_FRAME, 
-                      MKSB_CMD_POWER, 
-                      2, 
-                      0,
-                      0,
-                      255 }; // placeholder checksum
-  data[sizeof (data)-1] = MksbChecksum(data, sizeof (data));
-  return MksbSend(data, sizeof (data));
+  static const uint8_t data[] PROGMEM = {  MKSB_CMD_POWER, 2, 0, 0 };
+  return MkSkyBluSend(data, sizeof (data));
 }
 
-bool MksbRequestPowerOff(void)
+bool MkSkyBluRequestPowerOff(void)
 {
-  uint8_t data[] = {  MKSB_START_FRAME, 
-                      MKSB_CMD_POWER, 
-                      1, 
-                      2,
-                      0,
-                      255 }; // placeholder checksum
-  data[sizeof (data)-1] = MksbChecksum(data, sizeof (data));
-  return MksbSend(data, sizeof (data));
+  static const uint8_t data[] PROGMEM = {  MKSB_CMD_POWER, 1, 2, 0 };
+  return MkSkyBluSend(data, sizeof (data));
 }
+
 
 /********************************************************************************************/
 /* COMMAND RESPONSES */
 
-void MksbParseStatusDataResponse(uint8_t len)
+void MkSkyBluParseStatusDataResponse(void)
 {
   uint16_t u16 = 0;
   
-  if ( 20 != len ) { 
-    MKSB_COM_RX_IncrementCnt(MKSB_COM_ERR_RX_LENGTH);
-    return; // invalid length, bad response
-  }
-
   // Energy->power_on: not used, because ESP device acts as gateway to the charge controller
   
                                                                             // response data content:
-  Energy->voltage[1] = (float)MksbExtractUint(me.pRxBuffer,  2, 3) / 10.0f; // battery voltage [0.1V]
-  Energy->current[1] = (float)MksbExtractUint(me.pRxBuffer,  4, 5) / 10.0f; // battery current [0.1A]
-  Energy->voltage[0] = (float)MksbExtractUint(me.pRxBuffer,  6, 7) / 10.0f; // solar voltage   [0.1V]
-  Energy->active_power[0] = (float)MksbExtractUint(me.pRxBuffer,  8, 9);    // solar power     [1.0W]
+  Energy->voltage[1] = (float)MkSkyBluExtractUint(mksb_pRxBuffer,  2, 3) / 10.0f; // battery voltage [0.1V]
+  Energy->current[1] = (float)MkSkyBluExtractUint(mksb_pRxBuffer,  4, 5) / 10.0f; // battery current [0.1A]
+  Energy->voltage[0] = (float)MkSkyBluExtractUint(mksb_pRxBuffer,  6, 7) / 10.0f; // solar voltage   [0.1V]
+  Energy->active_power[0] = (float)MkSkyBluExtractUint(mksb_pRxBuffer,  8, 9);    // solar power     [1.0W]
   // calculate: battery power
   Energy->active_power[1] = Energy->voltage[1] * Energy->current[1]; 
   if ( Energy->voltage[0] >= 0.1f ) { // prevent division by 0
@@ -356,23 +316,23 @@ void MksbParseStatusDataResponse(uint8_t len)
   } else {
     Energy->current[0] = 0.0f;
   }
-  me.temperature = (float)MksbExtractUint(me.pRxBuffer, 10, 11) / 10.0f;    // temperature     [0.1degC]
+  mksb_temperature = (float)MkSkyBluExtractUint(mksb_pRxBuffer, 10, 11) / 10.0f;    // temperature     [0.1degC]
 
-#if _VARIANT_ENERGY_IMPORT == 1 /* import only once after restart: jitter only every restart */
-  if ( !me.energy_for_import ) {
-    me.energy_for_import++;
-    u16 = MksbExtractUint(me.pRxBuffer, 12, 13);                             // solar energy    [1.0kWh]
+#if MKSB_VARIANT_ENERGY_IMPORT == 1 /* import only once after restart: jitter only every restart */
+  if ( !mksb_energy_for_import ) {
+    mksb_energy_for_import++;
+    u16 = MkSkyBluExtractUint(mksb_pRxBuffer, 12, 13);                             // solar energy    [1.0kWh]
     if ( u16 ) {
-      me.energy_for_import = u16;
+      mksb_energy_for_import = u16;
       Energy->import_active[0] = (float)u16;
       Energy->import_active[1] = 0.0f; // there is no energy generated from the battery
       EnergyUpdateTotal();
     }
   }
-#elif _VARIANT_ENERGY_IMPORT == 2 /* import every full kWh integer resolution: jitter during runtime */
-  u16 = MksbExtractUint(me.pRxBuffer, 12, 13);                              // solar energy    [1.0kWh]
-  if ( me.energy_for_import != u16 ) {
-    me.energy_for_import = u16;
+#elif MKSB_VARIANT_ENERGY_IMPORT == 2 /* import every full kWh integer resolution: jitter during runtime */
+  u16 = MkSkyBluExtractUint(mksb_pRxBuffer, 12, 13);                              // solar energy    [1.0kWh]
+  if ( mksb_energy_for_import != u16 ) {
+    mksb_energy_for_import = u16;
     Energy->import_active[0] = (float)u16;
     Energy->import_active[1] = 0.0f; // there is no energy generated from the battery
     EnergyUpdateTotal();
@@ -383,7 +343,7 @@ void MksbParseStatusDataResponse(uint8_t len)
   Energy->data_valid[0] = 0;
   Energy->data_valid[1] = 0;
 
-  me.status = MksbExtractUint(me.pRxBuffer, 16, 17);  // mode flags [bits]
+  mksb_status = MkSkyBluExtractUint(mksb_pRxBuffer, 16, 17);  // mode flags [bits]
                                                       //   bit1=solar current limited (register 3)
                                                       //   bit2=MPPT Mode Active
                                                       //   more ?
@@ -392,109 +352,99 @@ void MksbParseStatusDataResponse(uint8_t len)
                                                       //   bit1=Batt.overvoltage (> register 1)
                                                       //   ?more
   // unused response data:
-  // MksbExtractUint(me.pRxBuffer, 14, 15); // ?dummy [14:15]
-  // MksbExtractUint(me.pRxBuffer, 18, 18); // ?dummy [18]
-    MKSB_COM_RX_IncrementCnt(MKSB_COM_RX_GOOD);
+  // MkSkyBluExtractUint(mksb_pRxBuffer, 14, 15); // ?dummy [14:15]
+  // MkSkyBluExtractUint(mksb_pRxBuffer, 18, 18); // ?dummy [18]
 }
 
-#ifdef _WITH_CONFIG_REGISTER_SUPPORT
-void MksbParseRegisterResponse(uint8_t len)
+#ifdef MKSB_WITH_CONFIG_REGISTER_SUPPORT
+void MkSkyBluParseRegisterResponse(void)
 {
   uint8_t reg;
 
-  if ( 9 != len ) { 
-    MKSB_COM_RX_IncrementCnt(MKSB_COM_ERR_RX_LENGTH);
-    return; // invalid length, bad response
-  }
-
-  reg = me.pRxBuffer[2];
+  reg = mksb_pRxBuffer[2];
   if ( reg < MKSB_REG_TOTAL ) {
-    me.regs_value[reg] = MksbExtractUint(me.pRxBuffer, 3, 4);
-    me.regs_to_report |= 1 << reg;
-    MKSB_COM_RX_IncrementCnt(MKSB_COM_RX_GOOD);
+    mksb_regs_value[reg] = MkSkyBluExtractUint(mksb_pRxBuffer, 3, 4);
+    mksb_regs_to_report |= 1 << reg;
   }
 }
 #endif
 
-#ifdef _WITH_ON_OFF_SUPPORT
-void MksbParsePowerResponse(uint8_t len)
+#ifdef MKSB_WITH_ON_OFF_SUPPORT
+void MkSkyBluParsePowerResponse(void)
 {
-  if ( 6 != len ) {
-    MKSB_COM_RX_IncrementCnt(MKSB_COM_ERR_RX_LENGTH);
-    return; // invalid length, bad response
-  }
-
-  if ( me.pRxBuffer[2] == 0 ) { /* ON */
-    me.actual_state = true;
+  if ( mksb_pRxBuffer[2] == 0 ) { /* ON */
+    mksb_actual_state = true;
     AddLog(LOG_LEVEL_INFO, PSTR("NRG: Charging enabled"));
-    MKSB_COM_RX_IncrementCnt(MKSB_COM_RX_GOOD);
   } else 
-  if ( me.pRxBuffer[2] == 1 ) {  /* OFF */
-    me.actual_state = false;
+  if ( mksb_pRxBuffer[2] == 1 ) {  /* OFF */
+    mksb_actual_state = false;
     AddLog(LOG_LEVEL_INFO, PSTR("NRG: Charging disabled"));
-    MKSB_COM_RX_IncrementCnt(MKSB_COM_RX_GOOD);
   } else { /* unknown content */
   }
 }
 #endif
 
 /********************************************************************************************/
-/* RECEIVE DATA */
+/* RECEIVE SERIAL DATA */
 
-void MksbSerialInput(void)
+void MkSkyBluSerialInput(void)
 {
-  while ( me.Serial->available() ) {
+  while ( mksb_Serial->available() ) {
     yield();
-    if ( me.rxCnt < MKSB_BUFFER_SIZE) {  // prevent buffer overrun
-      me.pRxBuffer[me.rxCnt] = me.Serial->read();
-      if ( me.pRxBuffer[0] == MKSB_START_FRAME ) { // preamble required for a valid frame
-        me.rxCnt++;
-      } else {
-        me.rxCnt = 0;
+    if (mksb_rxIdx < MKSB_BUFFER_SIZE) { // buffer not full
+      mksb_pRxBuffer[mksb_rxIdx] = mksb_Serial->read();
+      mksb_time_window = millis();
+      if (MKSB_START_FRAME != mksb_pRxBuffer[0] ) { // no start of frame yet
+        mksb_rxIdx = 0; // reset receiver
+      } else {                // [0] start valid
+        if (0 == mksb_rxIdx) {  // start of frame present
+          mksb_rxChecksum = 0;  // reset checksum calc
+          mksb_rxIdx++;         // more to receive
+        } else {              // [1+] cmd or later
+          if ((MKSB_RSP_READ_STATUS == mksb_pRxBuffer[1]) && (19 == mksb_rxIdx)) {
+            if ( mksb_rxChecksum == mksb_pRxBuffer[mksb_rxIdx] ) {
+              MkSkyBluParseStatusDataResponse();
+              mksb_timeout = 0;
+              MKSB_COM_RX_IncrementCnt(MKSB_COM_RX_GOOD);
+            } else {
+              MKSB_COM_RX_IncrementCnt(MKSB_COM_ERR_RX_CRC);
+            }
+          } else
+          if ((MKSB_RSP_RW_CONFIG == mksb_pRxBuffer[1]) && (8 == mksb_rxIdx)) {
+            if ( mksb_rxChecksum == mksb_pRxBuffer[mksb_rxIdx] ) {
+              MkSkyBluParseRegisterResponse();
+              mksb_timeout = 0;
+              MKSB_COM_RX_IncrementCnt(MKSB_COM_RX_GOOD);
+            } else {
+              MKSB_COM_RX_IncrementCnt(MKSB_COM_ERR_RX_CRC);
+            }
+          } else
+          if ((MKSB_RSP_POWER == mksb_pRxBuffer[1]) && (5 == mksb_rxIdx)) {
+            if ( mksb_rxChecksum == mksb_pRxBuffer[mksb_rxIdx] ) {
+              MkSkyBluParsePowerResponse();
+              mksb_timeout = 0;
+              MKSB_COM_RX_IncrementCnt(MKSB_COM_RX_GOOD);
+            } else {
+              MKSB_COM_RX_IncrementCnt(MKSB_COM_ERR_RX_CRC);
+            }
+          } else
+          if (20 == mksb_rxIdx) { // invalid command and / or length
+            MKSB_COM_RX_IncrementCnt(MKSB_COM_ERR_RX_CMD_LENGTH);
+          } else {            // calc checksum
+            mksb_rxChecksum += mksb_pRxBuffer[mksb_rxIdx]; 
+            mksb_rxIdx++;       // more to receive     
+          }
+        } 
       }
-    } else {
-      (void)me.Serial->read(); // overrun: drop byte
+    } else { // buffer full
+      (void)mksb_Serial->read(); // drop received byte
     }
-    me.time_window = millis();
-  }
-
-  // Ignore until non received after 6 chars (= 10 bits/char) time
-//  if ( (millis() - me.time_window) > ((60000 / MKSB_BAUDRATE) +1) ) {
-  if ( ((millis() - me.time_window) > 100) && me.rxCnt ) {
-#ifdef _WITH_SERIAL_DEBUGGING
-      { // serial debug at LOG_LEVEL_DEBUG_MORE: Request bytes transmitted
-        char hex_char[(me.rxCnt * 3) + 2];
-        AddLog(LOG_LEVEL_DEBUG_MORE, PSTR("NRG: Serial Rx %s"), ToHex_P( (uint8_t *)me.pRxBuffer, me.rxCnt, hex_char, sizeof (hex_char), ' '));
-      }
-#endif
-    if ( me.rxCnt >= 6) { // shortest response
-      if (MKSB_BUFFER_SIZE == me.rxCnt) {
-        MKSB_COM_RX_IncrementCnt(MKSB_COM_ERR_RX_OVERFLOW);
-      } else 
-      if (MksbChecksum((uint8_t *)me.pRxBuffer, me.rxCnt) != me.pRxBuffer[me.rxCnt -1]) {
-        MKSB_COM_RX_IncrementCnt(MKSB_COM_ERR_RX_CRC);
-      } else { // valid checksum
-        if (MKSB_RSP_READ_STATUS == me.pRxBuffer[1]) { MksbParseStatusDataResponse(me.rxCnt); } else
-#ifdef _WITH_CONFIG_REGISTER_SUPPORT
-        if (MKSB_RSP_RW_CONFIG == me.pRxBuffer[1]) { MksbParseRegisterResponse(me.rxCnt); } else
-#endif
-#ifdef _WITH_ON_OFF_SUPPORT
-        if (MKSB_RSP_POWER == me.pRxBuffer[1]) { MksbParsePowerResponse(me.rxCnt); } else
-#endif
-          MKSB_COM_RX_IncrementCnt(MKSB_COM_ERR_RX_COMMAND);
-        me.timeout = 0;
-      }
-    } else {
-      MKSB_COM_RX_IncrementCnt(MKSB_COM_ERR_RX_TOO_SHORT);
-    }
-    me.rxCnt = 0;
-    me.Serial->flush();
   }
 }
 
 /********************************************************************************************/
 
-void MksbEverySecond(void)
+void MkSkyBluEverySecond(void)
 {
   int i;
 
@@ -506,57 +456,57 @@ void MksbEverySecond(void)
     EnergyUpdateToday();
   }
 
-  if (me.timeout) { // busy, waiting for answer
-    me.timeout--;
-    if ( me.timeout == 0 ) {
+  if (mksb_timeout) { // busy, waiting for response
+    mksb_timeout--;
+    if ( mksb_timeout == 0 ) {
       MKSB_COM_RX_IncrementCnt(MKSB_COM_ERR_RX_TIMEOUT);
     }
   } else { // available
-#ifdef _WITH_SERIAL_DEBUGGING
-    if ( me.lastRxCntError ) { // new error
-      if ( me.cntRx[me.lastRxCntError] ) { // error available
+#ifdef MKSB_WITH_SERIAL_DEBUGGING
+    if ( mksb_lastRxCntError ) { // new error
+      if ( mksb_cntRx[mksb_lastRxCntError] ) { // error available
         AddLog(LOG_LEVEL_ERROR, PSTR("NRG: Serial Tx %u, Rx-good %u, Rx-error-%s %u"), 
-          me.cntTx,
-          me.cntRx[MKSB_COM_RX_GOOD], 
-          mksb_rx_counter_names[me.lastRxCntError], me.cntRx[me.lastRxCntError] );
+          mksb_cntTx,
+          mksb_cntRx[MKSB_COM_RX_GOOD], 
+          mksb_rx_counter_names[mksb_lastRxCntError], mksb_cntRx[mksb_lastRxCntError] );
       }
-      me.lastRxCntError = 0;
+      mksb_lastRxCntError = 0;
     } else
-    if ( 0 == (me.cntTx % (10 * 60) ) ) { // every 10 minutes: Info
+    if ( 0 == (mksb_cntTx % (10 * 60) ) ) { // every 10 minutes: Info
       AddLog(LOG_LEVEL_INFO, PSTR("NRG: Serial Tx %u, Rx-good %u"), 
-        me.cntTx, 
-        me.cntRx[MKSB_COM_RX_GOOD] );
+        mksb_cntTx, 
+        mksb_cntRx[MKSB_COM_RX_GOOD] );
       for ( i = 1; i < MKSB_COM_RX_COUNTER; i++ ) { // check all errors
-        if ( me.cntRx[i] ) { // reports only if there are errors 
+        if ( mksb_cntRx[i] ) { // reports only if there are errors 
           AddLog(LOG_LEVEL_ERROR, PSTR("NRG: Serial Rx-error-%s %u"), 
-            mksb_rx_counter_names[i], me.cntRx[i]);
+            mksb_rx_counter_names[i], mksb_cntRx[i]);
         }
       }
     } else {}
 #endif
     // request new measurements data
-    MksbRequestStatusData();
+    MkSkyBluRequestMeasurements();
   }
 }
 
 
-void MksbEvery250ms(void)
+void MkSkyBluEvery250ms(void)
 { 
   int i;
-#ifdef _WITH_CONFIG_REGISTER_SUPPORT
+#ifdef MKSB_WITH_CONFIG_REGISTER_SUPPORT
   float fVal;
 
-  if ( me.regs_to_read || me.regs_to_write ) {
+  if ( mksb_regs_to_read || mksb_regs_to_write ) {
     for ( i = 0; i < MKSB_REG_TOTAL; i++ ) {
-      if ( me.regs_to_write & (1 << i) ) { // prio write
-        if ( MksbRequestWriteRegister( i, me.regs_value[i] ) == true ) {
-          me.regs_to_write &= ~(1 << i);
+      if ( mksb_regs_to_write & (1 << i) ) { // prio write
+        if ( MkSkyBluRequestWriteRegister( i, mksb_regs_value[i] ) == true ) {
+          mksb_regs_to_write &= ~(1 << i);
           break; // only one per call
         }
       } else 
-      if ( me.regs_to_read & (1 << i) ) { 
-        if ( MksbRequestReadRegister( i ) == true ) {
-          me.regs_to_read &= ~(1 << i);
+      if ( mksb_regs_to_read & (1 << i) ) { 
+        if ( MkSkyBluRequestReadRegister( i ) == true ) {
+          mksb_regs_to_read &= ~(1 << i);
           break; // only one per call
         }
       } else {
@@ -564,27 +514,27 @@ void MksbEvery250ms(void)
     }
   } else 
 #endif
-#ifdef _WITH_ON_OFF_SUPPORT
-  if ( me.actual_state != me.target_state ) {
-    if (me.timeout) { // waiting for answer  
+#ifdef MKSB_WITH_ON_OFF_SUPPORT
+  if ( mksb_actual_state != mksb_target_state ) {
+    if (mksb_timeout) { // waiting for answer  
       return;
     }
-    if ( me.target_state == false ) { // standby
-      MksbRequestPowerOff();
+    if ( mksb_target_state == false ) { // standby
+      MkSkyBluRequestPowerOff();
     } else { // avtivate
-      MksbRequestPowerOn();
+      MkSkyBluRequestPowerOn();
     }
   } else 
 #endif
   {}
-#ifdef _WITH_CONFIG_REGISTER_SUPPORT
-  if ( me.regs_to_report ) {
+#ifdef MKSB_WITH_CONFIG_REGISTER_SUPPORT
+  if ( mksb_regs_to_report ) {
     for ( i = 0; i < MKSB_REG_TOTAL; i++ ) {
-      if ( me.regs_to_report & (1 << i) ) {
-        fVal = ((float)(me.regs_value[i])) / 1000.0f;
+      if ( mksb_regs_to_report & (1 << i) ) {
+        fVal = ((float)(mksb_regs_value[i])) / 1000.0f;
         // answer requested manually by user
         AddLog( LOG_LEVEL_NONE, PSTR("NRG: Register%s = %3_f"), mksb_register_names[i], &fVal);
-        me.regs_to_report &= ~(1 << i);
+        mksb_regs_to_report &= ~(1 << i);
         break; // once per call
       }
     }
@@ -593,7 +543,7 @@ void MksbEvery250ms(void)
 }
 
 
-bool MksbCommand(void)
+bool MkSkyBluEnergyCommand(void)
 {
   bool serviced = true;
   uint8_t reg;
@@ -608,20 +558,20 @@ bool MksbCommand(void)
       XdrvMailbox.index, XdrvMailbox.payload, XdrvMailbox.data ? XdrvMailbox.data : "null" );
 
     if ( XdrvMailbox.data_len == 0 ) { // no data: Read all registers and report to log
-#ifdef _WITH_CONFIG_REGISTER_SUPPORT
-      me.regs_to_read = (1 << MKSB_REG_TOTAL) - 1; // flag all registers to be read
+#ifdef MKSB_WITH_CONFIG_REGISTER_SUPPORT
+      mksb_regs_to_read = (1 << MKSB_REG_TOTAL) - 1; // flag all registers to be read
 #endif
     } else {
       str = XdrvMailbox.data;
-#ifdef _WITH_ON_OFF_SUPPORT
+#ifdef MKSB_WITH_ON_OFF_SUPPORT
       if ('+' == str[0] ) { // + to set controller active
-        me.target_state = true;
+        mksb_target_state = true;
       } else
       if ('-' == str[0] ) { // - to set controller stop
-        me.target_state = false;
+        mksb_target_state = false;
       } else
 #endif
-#ifdef _WITH_CONFIG_REGISTER_SUPPORT
+#ifdef MKSB_WITH_CONFIG_REGISTER_SUPPORT
       {
         reg = (uint8_t)strtoul( str, &str, 10 );
         if ( MKSB_REG_TOTAL > reg ) {
@@ -630,11 +580,11 @@ bool MksbCommand(void)
             value = (int32_t)(CharToFloat(str) * 1000.0f);
             // write Register: no range check here, all on your own risk
             if ( MKSB_REG_VOLTAGE_BULK <= reg && MKSB_REG_BATT_UVP_CONN >= reg ) {
-              me.regs_value[reg] = value;   // store to prepare write
-              me.regs_to_write |= 1 << reg; // trigger write
+              mksb_regs_value[reg] = value;   // store to prepare write
+              mksb_regs_to_write |= 1 << reg; // trigger write
             } // else read only
           } else { // read one register
-              me.regs_to_read |= 1 << reg; 
+              mksb_regs_to_read |= 1 << reg; 
           }
         } // invalid register
       }
@@ -649,18 +599,18 @@ bool MksbCommand(void)
 }
 
 
-void MksbShow(uint32_t function) {
+void MkSkyBluShow(uint32_t function) {
   float fVal;
 
   if ( Settings->flag.temperature_conversion ) {
-    fVal = ConvertTempToFahrenheit( me.temperature );
+    fVal = ConvertTempToFahrenheit( mksb_temperature );
   } else {
-    fVal = me.temperature; // celsius
+    fVal = mksb_temperature; // celsius
   }
  
   if ( FUNC_JSON_APPEND == function ) {
     /* Temperature */
-    ResponseAppend_P(JSON_SNS_F_TEMP, "MkSkyBlu", Settings->flag2.temperature_resolution, &fVal);
+    ResponseAppend_P(JSON_SNS_F_TEMP, PSTR("MkSkyBlu"), Settings->flag2.temperature_resolution, &fVal);
     if (0 == TasmotaGlobal.tele_period) {
 #ifdef USE_DOMOTICZ
       DomoticzFloatSensor(DZ_TEMP, fVal);
@@ -673,28 +623,28 @@ void MksbShow(uint32_t function) {
 #ifdef USE_WEBSERVER
   else if ( FUNC_WEB_SENSOR == function ) {
     WSContentSend_Temp("", fVal);
-    WSContentSend_P(MKSB_HTTP_SNS_str_m_int, D_INFO, me.status );
-//    WSContentSend_P( MKSB_HTTP_SNS_sS_m_Se , D_POWERUSAGE ,me.actual_state == true ? D_ENABLED: D_DISABLED );
+    WSContentSend_P(MKSB_HTTP_SNS_str_m_int, D_INFO, mksb_status );
+//    WSContentSend_P( MKSB_HTTP_SNS_sS_m_Se , D_POWERUSAGE ,mksb_actual_state == true ? D_ENABLED: D_DISABLED );
   } else if ( FUNC_WEB_COL_SENSOR == function ) {
-    WSContentSend_P( "MakeSkyBlue" ); // headline before values
+    WSContentSend_P( PSTR("MakeSkyBlue") ); // headline before values
   } else {}
 #endif  // USE_WEBSERVER
 }
 
 
-void MksbSnsInit(void)
+void MkSkyBluSnsInit(void)
 {
   // Software serial init needs to be done here as earlier (serial) interrupts may lead to Exceptions
-  me.Serial = new TasmotaSerial(Pin(GPIO_MKSKYBLU_RX), Pin(GPIO_MKSKYBLU_TX), 1);
-  if (me.Serial->begin(MKSB_BAUDRATE)) {
-    if (me.Serial->hardwareSerial()) {
+  mksb_Serial = new TasmotaSerial(Pin(GPIO_MKSKYBLU_RX), Pin(GPIO_MKSKYBLU_TX), 1);
+  if (mksb_Serial->begin(MKSB_BAUDRATE)) {
+    if (mksb_Serial->hardwareSerial()) {
       ClaimSerial();
-      me.pRxBuffer = TasmotaGlobal.serial_in_buffer;  // Use idle serial buffer to save RAM
+      mksb_pRxBuffer = TasmotaGlobal.serial_in_buffer;  // Use idle serial buffer to save RAM
     } else {
-      me.pRxBuffer = (char*)(malloc(MKSB_BUFFER_SIZE));
+      mksb_pRxBuffer = (char*)(malloc(MKSB_BUFFER_SIZE));
     }
 #ifdef ESP32
-    AddLog(LOG_LEVEL_DEBUG, PSTR("NRG: MkSkyBlu Serial UART%d"), me.Serial->getUart());
+    AddLog(LOG_LEVEL_DEBUG, PSTR("NRG: MkSkyBlu Serial UART%d"), mksb_Serial->getUart());
 #endif
   } else {
     TasmotaGlobal.energy_driver = ENERGY_NONE;
@@ -702,11 +652,11 @@ void MksbSnsInit(void)
 }
 
 
-void MksbDrvInit(void)
+void MkSkyBluDrvInit(void)
 {
   if (PinUsed(GPIO_MKSKYBLU_RX) && PinUsed(GPIO_MKSKYBLU_TX)) {
     Energy->phase_count = 2; // phases as channels: 0=solar input, 1=battery
-#ifdef _WITH_PHASE_NAME_SUPPORT
+#ifdef MKSB_WITH_PHASE_NAME_SUPPORT
     Energy->phase_names = mksb_channels;
 #endif
     Energy->voltage_common = false;
@@ -717,21 +667,21 @@ void MksbDrvInit(void)
     Energy->current_available = true; // solar indirect, battery direct 
     // Energy->local_energy_active_export = ?;
 
-    me.timeout = 2;                   // Initial wait
-#ifdef _WITH_SERIAL_DEBUGGING
-    me.cntRx[MKSB_COM_ERR_RX_TIMEOUT] = 0xFFFFFFFF; // occurence at startup results to 0
+    mksb_timeout = 2;                   // Initial wait
+#ifdef MKSB_WITH_SERIAL_DEBUGGING
+    mksb_cntRx[MKSB_COM_ERR_RX_TIMEOUT] = 0xFFFFFFFF; // occurence at startup results to 0
 #endif
-    me.time_window = 0;
-    me.temperature = NAN;
-    me.energy_for_import = 0;
-#ifdef _WITH_CONFIG_REGISTER_SUPPORT
-    me.regs_to_read = 0;
-    me.regs_to_write = 0;
-    me.regs_to_report = 0;
+    mksb_time_window = 0;
+    mksb_temperature = NAN;
+    mksb_energy_for_import = 0;
+#ifdef MKSB_WITH_CONFIG_REGISTER_SUPPORT
+    mksb_regs_to_read = 0;
+    mksb_regs_to_write = 0;
+    mksb_regs_to_report = 0;
 #endif
-#ifdef _WITH_ON_OFF_SUPPORT
-    me.actual_state = true; // default
-    me.target_state = true; // default
+#ifdef MKSB_WITH_ON_OFF_SUPPORT
+    mksb_actual_state = true; // default
+    mksb_target_state = true; // default
 #endif
     TasmotaGlobal.energy_driver = XNRG_25;
   }
@@ -748,32 +698,32 @@ bool Xnrg25(uint32_t function)
 
   switch (function) {
     case FUNC_LOOP:
-      if (me.Serial) { MksbSerialInput(); }
+      if (mksb_Serial) { MkSkyBluSerialInput(); }
       break;
     case FUNC_EVERY_250_MSECOND:
-      if (me.Serial) { MksbEvery250ms(); }
+      if (mksb_Serial) { MkSkyBluEvery250ms(); }
       break;
 
     case FUNC_ENERGY_EVERY_SECOND:
-      if (me.Serial) { MksbEverySecond(); }
+      if (mksb_Serial) { MkSkyBluEverySecond(); }
       break;
 
     case FUNC_JSON_APPEND:
     case FUNC_WEB_SENSOR:
     case FUNC_WEB_COL_SENSOR:
-      MksbShow(function);
+      MkSkyBluShow(function);
       break;
     case FUNC_ENERGY_RESET:
-      me.temperature = NAN;
+      mksb_temperature = NAN;
       break;
     case FUNC_COMMAND:
-      result = MksbCommand();
+      result = MkSkyBluEnergyCommand();
       break;
     case FUNC_INIT:
-      MksbSnsInit();
+      MkSkyBluSnsInit();
       break;
     case FUNC_PRE_INIT:
-      MksbDrvInit();
+      MkSkyBluDrvInit();
       break;
   }
   return result;
