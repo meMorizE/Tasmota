@@ -74,6 +74,8 @@
     "files.associations": {
       "array": "cpp",
       "string": "cpp",
-      "functional": "cpp"
+      "functional": "cpp",
+      "*.tcc": "cpp",
+      "sstream": "cpp"
     }
   }
