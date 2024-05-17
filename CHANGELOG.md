@@ -5,16 +5,22 @@ All notable changes to this project will be documented in this file.
 
 ## [14.0.0.1]
 ### Added
-
+- Enabled watchdog for ESP32 and variants (#21422)
 
 ### Breaking Changed
 
 ### Changed
+- ESP32 compiler option from `target-align` to `no-target-align` (#21407)
+- On universal display remove default backlight power if a PWM channel is used for backlight
+- Berry binary compiled with gcc
 
 ### Fixed
+- Domoticz re-subscribe on MQTT reconnect. Regression from v13.4.0.3 (#21281)
+- Watchdog restart or freeze if ``displaytext`` is more than 128 characters (#21401)
+- Avoid connection errors when switching to safeboot to upload OTA firmware
 
 ### Removed
-
+- Support of old insecure fingerprint algorithm. Deprecated since v8.4.0 (#21417)
 
 ## [Released]
 
