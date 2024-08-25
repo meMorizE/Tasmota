@@ -42,9 +42,9 @@ const uint8_t WIFI_RETRY_OFFSET_SEC = WIFI_RETRY_SECONDS;  // seconds
 
 #include <ESP8266WiFi.h>                   // Wifi, MQTT, Ota, WifiManager
 #include "lwip/dns.h"
-#if ESP_IDF_VERSION_MAJOR >= 5
+#ifdef ESP32
   #include "esp_netif.h"
-#endif
+#endif  // ESP32
 
 int WifiGetRssiAsQuality(int rssi) {
   int quality = 0;
@@ -1159,7 +1159,9 @@ void WifiDisable(void) {
 void EspRestart(void) {
   ResetPwm();
   WifiShutdown(true);
+#ifndef FIRMWARE_MINIMAL
   CrashDumpClear();           // Clear the stack dump in RTC
+#endif // FIRMWARE_MINIMAL
 
 #ifdef CONFIG_IDF_TARGET_ESP32C3
   GpioForceHoldRelay();       // Retain the state when the chip or system is reset, for example, when watchdog time-out or Deep-sleep
