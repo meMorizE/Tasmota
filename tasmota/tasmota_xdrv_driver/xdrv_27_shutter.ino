@@ -654,7 +654,8 @@ void ShutterWaitForMotorStop(uint8_t i)
 
 void ShutterWaitForMotorStart(uint8_t i)
 {
-  while (millis() < Shutter[i].last_stop_time + Settings->shutter_motorstop) {
+  uint32_t end_time = Shutter[i].last_stop_time + Settings->shutter_motorstop;
+  while (!TimeReached(end_time)) {
     loop();
   }
   //AddLog(LOG_LEVEL_DEBUG_MORE, PSTR("SHT: Stoptime done"));
@@ -731,13 +732,12 @@ void ShutterAllowPreStartProcedure(uint8_t i) {
   // What PreStartProcedure do you want to execute here?
   // Anyway, as long var1 != 99 this is skipped (luckily)
 #ifdef USE_RULES
-  uint32_t uptime_Local=0;
-  AddLog(LOG_LEVEL_DEBUG_MORE, PSTR("SHT: Delay Start? var%d <99>=<%s>, max10s?"),i+1, rules_vars[i]);
-  uptime_Local = TasmotaGlobal.uptime;
-  while (uptime_Local+10 > TasmotaGlobal.uptime && (String)rules_vars[i] == "99") {
-    loop();
+  AddLog(LOG_LEVEL_DEBUG_MORE, PSTR("SHT: Delay Start? var%d <99>=<%s>, max10s?"),i + 1, rules_vars[i]);
+  // wait for response from rules
+  uint32_t end_time = millis() + 10000;
+  while (!TimeReached(end_time) && (String)rules_vars[i] == "99") {
+    delay(1);
   }
-  //AddLog(LOG_LEVEL_DEBUG_MORE, PSTR("SHT: Delay Start. Done"));
 #endif  // USE_RULES
 }
 
@@ -1332,11 +1332,10 @@ void CmndShutterPosition(void)
       }
 
       int8_t target_pos_percent = (XdrvMailbox.payload < 0) ? (XdrvMailbox.payload == -99 ? ShutterRealToPercentPosition(Shutter[index].real_position, index) : 0) : ((XdrvMailbox.payload > 100) ? 100 : XdrvMailbox.payload);
-      target_pos_percent = ((Settings->shutter_options[index] & 1) && ((SRC_MQTT       != TasmotaGlobal.last_source)
-                                                                    && (SRC_SERIAL     != TasmotaGlobal.last_source)
-                                                                    && (SRC_WEBGUI     != TasmotaGlobal.last_source)
-                                                                    && (SRC_WEBCOMMAND != TasmotaGlobal.last_source)
-                                                                       )) ? 100 - target_pos_percent : target_pos_percent;
+      target_pos_percent = ((Settings->shutter_options[index] & 1) && (    (SRC_SERIAL     != TasmotaGlobal.last_source)
+                                                                        && (SRC_WEBGUI     != TasmotaGlobal.last_source)
+                                                                        && (SRC_WEBCOMMAND != TasmotaGlobal.last_source)
+                                                                      )) ? 100 - target_pos_percent : target_pos_percent;
 	    
       // if position is either 0 or 100 reset the tilt to avoid tilt moving at the end
       if (target_pos_percent ==   0 && ShutterRealToPercentPosition(Shutter[index].real_position, index)  > 0  ) {Shutter[index].tilt_target_pos = Shutter[index].tilt_config[4];}
