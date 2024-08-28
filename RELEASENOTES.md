@@ -129,6 +129,7 @@ The latter links can be used for OTA upgrades too like ``OtaUrl https://ota.tasm
 ### Breaking Changed
 
 ### Changed
+- ESP32 platform update from 2024.08.10 to 2024.08.11 [#22021](https://github.com/arendst/Tasmota/issues/22021)
 - GPIOViewer from v1.5.5 to v1.5.6
 - Energy BL09xx command ``CurrentSet`` input changed from Ampere to milliAmpere
 - Energy force Apparent Power equals Active Power when (Calculated) Apparent Power is less than Active Power [#20653](https://github.com/arendst/Tasmota/issues/20653)
@@ -137,6 +138,10 @@ The latter links can be used for OTA upgrades too like ``OtaUrl https://ota.tasm
 - Energy calculation [#20653](https://github.com/arendst/Tasmota/issues/20653)
 - Shutter timing registers overflow [#21966](https://github.com/arendst/Tasmota/issues/21966)
 - PZEM continue energy monitoring when one phase fails [#21968](https://github.com/arendst/Tasmota/issues/21968)
+- BearSSL panic on ESP8266 in rare conditions [#22017](https://github.com/arendst/Tasmota/issues/22017)
+- Zigbee extend timeout for MCU reboot from 5s to 10s [#22009](https://github.com/arendst/Tasmota/issues/22009)
+- Matter fixed UI bug when no endpoints configured [#22008](https://github.com/arendst/Tasmota/issues/22008)
+- Matter fix when Rules are disabled [#22016](https://github.com/arendst/Tasmota/issues/22016)
 
 ### Removed
 - ESP8266 Analog input support using energy driver as only one channel is available

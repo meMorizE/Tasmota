@@ -10,12 +10,15 @@ All notable changes to this project will be documented in this file.
 ### Breaking Changed
 
 ### Changed
+- ESP32 platform update from 2024.08.10 to 2024.08.11 (#22021)
+- ESP32 LVGL library from v9.1.0 to v9.2.0
 
 ### Fixed
-- Matter fixed UI bug when no endpoints configured
-- Zigbee extend timeout for MCU reboot from 5s to 10s
-- Matter fix when Rules are disabled
-- BearSSL panic on ESP8266 in rare conditions
+- Matter fixed UI bug when no endpoints configured (#22008)
+- Zigbee extend timeout for MCU reboot from 5s to 10s (#22009)
+- Matter fix when Rules are disabled (#22016)
+- BearSSL panic on ESP8266 in rare conditions (#22017)
+- Crash when calling TasmotaSerial destructor when initialized with incorrect arguments
 
 ### Removed
 
