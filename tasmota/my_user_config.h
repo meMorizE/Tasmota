@@ -172,6 +172,7 @@
 #define MQTT_BUTTON_SWITCH_FORCE_LOCAL   false   // [SetOption61] Force local operation when button/switch topic is set (false = off, true = on)
 #define MQTT_INDEX_SEPARATOR   false             // [SetOption64] Enable "_" instead of "-" as sensor index separator
 #define MQTT_TUYA_RECEIVED     false             // [SetOption66] Enable TuyaMcuReceived messages over Mqtt
+#define MQTT_ONLY_JSON_OUTPUT  false             // [SetOption90] Disable non-json messages
 #define MQTT_TLS_ENABLED       false             // [SetOption103] Enable TLS mode (requires TLS version)
 #define MQTT_TLS_FINGERPRINT   false             // [SetOption132] Force TLS fingerprint validation instead of CA (requires TLS version)
 
@@ -185,12 +186,15 @@
   #define CORS_DOMAIN            ""                // [Cors] CORS Domain for preflight requests
 
 // -- HTTP Options --------------------------------
+#define GUI_NOSHOW_MODULE      false             // [SetOption141] Do not show module name in GUI main menu
+#define GUI_NOSHOW_DEVICENAME  false             // [SetOption163] Do not show device name in GUI main menu
 #define GUI_SHOW_HOSTNAME      false             // [SetOption53] Show hostname and IP address in GUI main menu
+#define GUI_NOSHOW_STATETEXT   false             // [SetOption161] Do not show power state text in GUI
 
 // -- HTTP GUI Colors -----------------------------
 // HTML hex color codes. Only 3 and 6 digit hex string values are supported!! See https://www.w3schools.com/colors/colors_hex.asp
 // Light theme - pre v7
-// WebColor {"WebColor":["#000","#fff","#f2f2f2","#000","#fff","#000","#fff","#f00","#008000","#fff","#1fa3ec","#0e70a4","#d43535","#931f1f","#47c266","#5aaf6f","#fff","#999","#000"]}
+// WebColor {"WebColor":["#000","#fff","#f2f2f2","#000","#fff","#000","#fff","#f00","#008000","#fff","#1fa3ec","#0e70a4","#d43535","#931f1f","#47c266","#5aaf6f","#fff","#999","#000","#08405e"]}
 /*
 #define COLOR_TEXT                  "#000"       // [WebColor1] Global text color - Black
 #define COLOR_BACKGROUND            "#fff"       // [WebColor2] Global background color - White
@@ -211,9 +215,10 @@
 #define COLOR_TIMER_TAB_TEXT        "#fff"       // [WebColor17] Config timer tab text color - White
 #define COLOR_TIMER_TAB_BACKGROUND  "#999"       // [WebColor18] Config timer tab background color - Dark gray
 #define COLOR_TITLE_TEXT            "#000"       // [WebColor19] Title text color - Whiteish
+#define COLOR_BUTTON_OFF            "#a1d9f7"    // [WebColor20] Button color when off - Light blue
 */
 // Dark theme
-// WebColor {"WebColor":["#eaeaea","#252525","#4f4f4f","#000","#ddd","#65c115","#1f1f1f","#ff5661","#008000","#faffff","#1fa3ec","#0e70a4","#d43535","#931f1f","#47c266","#5aaf6f","#faffff","#999","#eaeaea"]}
+// WebColor {"WebColor":["#eaeaea","#252525","#4f4f4f","#000","#ddd","#65c115","#1f1f1f","#ff5661","#008000","#faffff","#1fa3ec","#0e70a4","#d43535","#931f1f","#47c266","#5aaf6f","#faffff","#999","#eaeaea","#08405e"]}
 #define COLOR_TEXT                  "#eaeaea"    // [WebColor1] Global text color - Very light gray
 #define COLOR_BACKGROUND            "#252525"    // [WebColor2] Global background color - Very dark gray (mostly black)
 #define COLOR_FORM                  "#4f4f4f"    // [WebColor3] Form background color - Very dark gray
@@ -233,6 +238,7 @@
 #define COLOR_TIMER_TAB_TEXT        "#faffff"    // [WebColor17] Config timer tab text color - Very pale (mostly white) cyan.
 #define COLOR_TIMER_TAB_BACKGROUND  "#999"       // [WebColor18] Config timer tab background color - Dark gray
 #define COLOR_TITLE_TEXT            "#eaeaea"    // [WebColor19] Title text color - Very light gray
+#define COLOR_BUTTON_OFF            "#08405e"    // [WebColor20] Button color when off - Darkest blueish
 
 // -- KNX -----------------------------------------
 #define KNX_ENABLED            false             // [Knx_Enabled] Enable KNX protocol
@@ -561,13 +567,6 @@
 
 // -- Optional light modules ----------------------
 #define USE_LIGHT                                // Add support for light control
-#define USE_WS2812                               // WS2812 Led string using library NeoPixelBus (+5k code, +1k mem, 232 iram) - Disable by //
-//  #define USE_WS2812_DMA                         // ESP8266 only, DMA supports only GPIO03 (= Serial RXD) (+1k mem). When USE_WS2812_DMA is enabled expect Exceptions on Pow
-  #define USE_WS2812_RMT  0                      // ESP32 only, hardware RMT support (default). Specify the RMT channel 0..7. This should be preferred to software bit bang.
-//  #define USE_WS2812_I2S  0                      // ESP32 only, hardware I2S support. Specify the I2S channel 0..2. This is exclusive from RMT. By default, prefer RMT support
-//  #define USE_WS2812_INVERTED                    // Use inverted data signal
-  #define USE_WS2812_HARDWARE  NEO_HW_WS2812     // Hardware type (NEO_HW_WS2812, NEO_HW_WS2812X, NEO_HW_WS2813, NEO_HW_SK6812, NEO_HW_LC8812, NEO_HW_APA106, NEO_HW_P9813)
-  #define USE_WS2812_CTYPE     NEO_GRB           // Color type (NEO_RGB, NEO_GRB, NEO_BRG, NEO_RBG, NEO_RGBW, NEO_GRBW)
 #define USE_MY92X1                               // Add support for MY92X1 RGBCW led controller as used in Sonoff B1, Ailight and Lohas
 #define USE_SM16716                              // Add support for SM16716 RGB LED controller (+0k7 code)
 #define USE_SM2135                               // Add support for SM2135 RGBCW led control as used in Action LSC (+0k6 code)
@@ -580,6 +579,18 @@
 #define USE_LIGHT_VIRTUAL_CT                     // Add support for Virtual White Color Temperature (+1.1k code)
 #define USE_DGR_LIGHT_SEQUENCE                   // Add support for device group light sequencing (requires USE_DEVICE_GROUPS) (+0k2 code)
 //#define USE_LSC_MCSL                             // Add support for GPE Multi color smart light as sold by Action in the Netherlands (+1k1 code)
+
+// -- Optional adressable leds ----------------------
+#define USE_WS2812                               // WS2812 Led string using library NeoPixelBus (+5k code, +1k mem, 232 iram) - Disable by //
+// -------- below is for ESP8266 only
+//  #define USE_WS2812_DMA                         // ESP8266 only, DMA supports only GPIO03 (= Serial RXD) (+1k mem). When USE_WS2812_DMA is enabled expect Exceptions on Pow
+  #define USE_WS2812_RMT  0                      // ESP32 only, hardware RMT support (default). Specify the RMT channel 0..7. This should be preferred to software bit bang.
+//  #define USE_WS2812_I2S  0                      // ESP32 only, hardware I2S support. Specify the I2S channel 0..2. This is exclusive from RMT. By default, prefer RMT support
+//  #define USE_WS2812_INVERTED                    // Use inverted data signal
+  #define USE_WS2812_HARDWARE  NEO_HW_WS2812     // Hardware type (NEO_HW_WS2812, NEO_HW_WS2812X, NEO_HW_WS2813, NEO_HW_SK6812, NEO_HW_LC8812, NEO_HW_APA106, NEO_HW_P9813)
+  #define USE_WS2812_CTYPE     NEO_GRB           // Color type (NEO_RGB, NEO_GRB, NEO_BRG, NEO_RBG, NEO_RGBW, NEO_GRBW)
+// -------- below if for ESP32x only -- ESP32 uses a lightweight library instead of NeoPixelBus
+  // #define USE_WS2812_FORCE_NEOPIXELBUS           // this option forces to use NeoPixelBus (like ESP866), which disables Berry support and limits features -- DO NOT USE unless you have a good reason
 
 // #define USE_LIGHT_ARTNET                         // Add support for DMX/ArtNet via UDP on port 6454 (+3.5k code)
   #define USE_LIGHT_ARTNET_MCAST 239,255,25,54   // Multicast address used to listen: 239.255.25.54
@@ -603,6 +614,7 @@
 #define I2CDRIVERS_64_95       0xFFFFFFFF          // Enable I2CDriver64 to I2CDriver95
 
 #ifdef USE_I2C
+//  #define USE_I2C_BUS2                           // Add experimental support for second I2C bus on ESP8266 (+0k6k code)
 //  #define USE_SHT                                // [I2cDriver8] Enable SHT1X sensor (+1k4 code)
 //  #define USE_HTU                                // [I2cDriver9] Enable HTU21/SI7013/SI7020/SI7021 sensor (I2C address 0x40) (+1k5 code)
 //  #define USE_BMP                                // [I2cDriver10] Enable BMP085/BMP180/BMP280/BME280 sensors (I2C addresses 0x76 and 0x77) (+4k4 code)
@@ -730,8 +742,8 @@
 //                                                 // Both settings together allow to limit searching for INA3221 to only a subset of addresses
 //    #define  INA3221_CALC_CHARGE_AH              // calculate charge in Ah
 //    #define  INA3221_CALC_ENERGY_WH              // calculate energy in Wh
-//    #define  INA3221_SUPPLY_SIDE      0x7777     // the driver adds the measured Shunt Voltage to the Bus Voltage 
-                                                   // for the cannel with a negativ shunt (shunt <0) thus showing the values of the supply side (IN+) 
+//    #define  INA3221_SUPPLY_SIDE      0x7777     // the driver adds the measured Shunt Voltage to the Bus Voltage
+                                                   // for the cannel with a negativ shunt (shunt <0) thus showing the values of the supply side (IN+)
                                                    // additionaly the bits set (bit 0,1,2) enable the scanning of the voltage in the according channel
 //  #define USE_PMSA003I                           // [I2cDriver78] Enable PMSA003I Air Quality Sensor (I2C address 0x12) (+1k8 code)
 //  #define USE_GDK101                             // [I2cDriver79] Enable GDK101 sensor (I2C addresses 0x18 - 0x1B) (+1k2 code)
@@ -749,12 +761,15 @@
 //  #define USE_AMSX915                            // [I2CDriver86] Enable AMS5915/AMS6915 pressure/temperature sensor (+1k2 code)
 //  #define USE_SPL06_007                          // [I2cDriver87] Enable SPL06_007 pressure and temperature sensor (I2C addresses 0x76) (+2k5 code)
 //  #define USE_QMP6988                            // [I2cDriver88] Enable QMP6988 pressure and temperature sensor (I2C address 0x56 or 0x70) (+2k9 code)
+//  #define USE_MS5837                             // [I2cDriver91] Enable MS5837 sensor (I2C address 0x76) (+2k7 code)
 
 //  #define USE_RTC_CHIPS                          // Enable RTC chip support and NTP server - Select only one
-//    #define USE_DS3231                           // [I2cDriver26] Enable DS3231 RTC (I2C address 0x68) (+1k2 code)
+//    #define USE_DS3231                           // [I2cDriver26] Enable DS3231 RTC - used by Ulanzi TC001 (I2C address 0x68) (+1k2 code)
 //    #define DS3231_ENABLE_TEMP                   //   In DS3231 driver, enable the internal temperature sensor
-//    #define USE_BM8563                           // [I2cDriver59] Enable BM8563 RTC - found in M5Stack - support both I2C buses on ESP32 (I2C address 0x51) (+2.5k code)
-//    #define USE_PCF85363                         // [I2cDriver66] Enable PCF85363 RTC - found Shelly 3EM (I2C address 0x51) (+0k7 code)
+//    #define USE_BM8563                           // [I2cDriver59] Enable BM8563 RTC - used by M5Stack - support both I2C buses on ESP32 (I2C address 0x51) (+2.5k code)
+//    #define USE_PCF85363                         // [I2cDriver66] Enable PCF85363 RTC - used by Shelly 3EM (I2C address 0x51) (+0k7 code)
+//    #define USE_RX8010                           // [I2cDriver90] Enable RX8010 RTC - used by IOTTIMER - support both I2C buses on ESP32 (I2C address 0x32) (+0k7 code)
+//    #define USE_PCF85063                         // [I2cDriver92] Enable PCF85063 RTC support (I2C address 0x51)
 
 //  #define USE_DISPLAY                            // Add I2C/TM1637/MAX7219 Display Support (+2k code)
     #define USE_DISPLAY_MODES1TO5                // Enable display mode 1 to 5 in addition to mode 0
@@ -770,7 +785,7 @@
       #define MTX_ADDRESS7     0x00              // [DisplayAddress7] I2C address of seventh 8x8 matrix module
       #define MTX_ADDRESS8     0x00              // [DisplayAddress8] I2C address of eigth 8x8 matrix module
     #define USE_DISPLAY_SEVENSEG                 // [DisplayModel 11] [I2cDriver47] Enable sevenseg display (I2C 0x70-0x77) (<+11k code)
-//     #define USE_DISPLAY_SEVENSEG_COMMON_ANODE   // Enable support for common anode sevenseg displays
+//      #define USE_DISPLAY_SEVENSEG_COMMON_ANODE  // Enable support for common anode sevenseg displays
                                                  // Multiple sevenseg displays are logically arranged vertically with MTX_ADDRESS1 at y=0,
                                                  // MTX_ADDRESS2 at y=1, up to MTX_ADDRESS8 at y=7
                                                  // Command: DisplayText [yn]8888
@@ -778,7 +793,7 @@
                                                  // Each segment may be address Command: DisplayText [xn]m
                                                  //  where n is 0..4 (4 digits and middle :) and m is decimal for bitmap of which segment to turn on.
                                                  // Reference: https://cdn-learn.adafruit.com/downloads/pdf/adafruit-led-backpack.pdf
-    // #define SEVENSEG_ADDRESS1     0x70        // No longer used.  Use MTX_ADDRESS1 - MTX_ADDRESS8 instead to specify I2C address of sevenseg displays
+//      #define SEVENSEG_ADDRESS1     0x70         // No longer used.  Use MTX_ADDRESS1 - MTX_ADDRESS8 instead to specify I2C address of sevenseg displays
 //    #define USE_DISPLAY_SH1106                   // [DisplayModel 7] [I2cDriver6] Enable SH1106 Oled 128x64 display (I2C addresses 0x3C and 0x3D)
 //    #define USE_DISPLAY_TM1650                   // [DisplayModel 20] [I2cDriver74] Enable TM1650 display (I2C addresses 0x24 - 0x27 and 0x34 - 0x37)
 //    #define USE_DT_VARS                          // Display variables that are exposed in JSON MQTT strings e.g. in TelePeriod messages.
@@ -788,10 +803,12 @@
 
 #endif  // USE_I2C
 
-//  #define USE_DISPLAY                            // Add I2C/TM1637/MAX7219 Display Support (+2k code)
-//    #define USE_DISPLAY_TM1637                   // [DisplayModel 15] Enable TM1637 Seven Segment Display Module (4-6 digits)
-//    #define USE_DISPLAY_MAX7219                  // [DisplayModel 15] Enable MAX7219 Seven Segment Display Module (8 digits)
-//    #define USE_DISPLAY_MAX7219_MATRIX           // [DisplayModel 19] Enable MAX7219 8x8 Matrix Display
+//#define USE_DISPLAY                              // Add I2C/TM1637/MAX7219 Display Support (+2k code)
+//  #define USE_DISPLAY_TM1637                     // [DisplayModel 15] Enable TM1637 Seven Segment Display Module (4-6 digits)
+//  #define USE_DISPLAY_MAX7219                    // [DisplayModel 15] Enable MAX7219 Seven Segment Display Module (8 digits)
+//  #define USE_DISPLAY_MAX7219_MATRIX             // [DisplayModel 19] Enable MAX7219 8x8 Matrix Display
+//  #define USE_DISPLAY_TM1640                     // [DisplayModel 13] Enable TM1640 module  Seven Segment Display Module (stub)
+//    #define USE_IOTTIMER                         // Enable TM1640 based IotTimer
 
 // -- Universal Display Driver ---------------------------------
 // #define USE_UNIVERSAL_DISPLAY                   // New universal display driver for both I2C and SPI
@@ -878,12 +895,14 @@
 //#define USE_VINDRIKTNING                         // Add support for IKEA VINDRIKTNING particle concentration sensor (+0k6 code)
 //  #define VINDRIKTNING_SHOW_PM1                  // Display undocumented/supposed PM1.0 values
 //  #define VINDRIKTNING_SHOW_PM10                 // Display undocumented/supposed PM10 values
-//#define USE_LD2410                               // Add support for HLK-LD2410 24GHz smart wave motion sensor (+2k8 code)
+//#define USE_LD2410                               // Add support for HLK-LD2410 24GHz smart wave motion sensor (+3k7 code, 88 RAM)
+//#define USE_LD2410S                              // Add support for HLK-LD2410S Ultra Low-power 24GHz smart wave motion sensor (+4k7 code, 144 RAM)
 //#define USE_LOX_O2                               // Add support for LuminOx LOX O2 Sensor (+0k8 code)
 //#define USE_GM861                                // Add support for GM861 1D and 2D Bar Code Reader (+1k3 code)
 //  #define GM861_DECODE_AIM                       // Decode AIM-id (+0k3 code)
 //  #define GM861_HEARTBEAT                        // Enable heartbeat (+0k2 code)
 //#define USE_WOOLIIS                              // Add support for Wooliis Hall Effect Coulometer or Battery capacity monitor (+1k6 code)
+//#define USE_DALI                                 // Add support for DALI gateway (+5k code)
 
 // -- Power monitoring sensors --------------------
 #define USE_ENERGY_SENSOR                        // Add support for Energy Monitors (+14k code)
@@ -1044,6 +1063,7 @@
 //  #define TM1638_MAX_KEYS        8               // Add support for 8 keys
 //  #define TM1638_MAX_LEDS        8               // Add support for 8 leds
 //#define USE_HX711                                // Add support for HX711 load cell (+1k5 code)
+//  #define USE_HX711_M5SCALES                     // [I2cDriver89] Enable support for M5Unit (Mini)Scales (I2C address 0x26) (+0k4 code)
 //  #define USE_HX711_GUI                          // Add optional web GUI to HX711 as scale (+1k8 code)
 //  #define HX711_CAL_PRECISION     1              // When HX711 calibration is to course, raise this value
 
@@ -1137,11 +1157,6 @@
 #define USE_ESP32_SENSORS                        // Add support for ESP32 temperature and optional hall effect sensor
 #define USE_GPIO_VIEWER                          // Enable GPIO Viewer to see realtime GPIO states (+5k6 code)
 
-// #define USE_DALI                              // Add support for DALI
-    #define DALI_IN_INVERT  0                 // DALI RX inverted ?
-    #define DALI_OUT_INVERT  0                // DALI TX inverted ?
-    #define DALI_TIMER 0                      // ESP32 hardware timer number 0-3 !!! timer 3 used in xdrv_10_scripter.ino !!!
-
 //#define USE_SONOFF_SPM                           // Add support for ESP32 based Sonoff Smart Stackable Power Meter (+11k code)
 //#define USE_DISPLAY_TM1621_SONOFF                // Add support for TM1621 dsiplay driver used by Sonoff POWR3xxD and THR3xxD
 
@@ -1186,6 +1201,8 @@
                                                  // Note that only one cipher is enabled: ECDHE_RSA_WITH_AES_128_GCM_SHA256 which is very commonly used and highly secure
     #define USE_BERRY_WEBCLIENT_USERAGENT  "TasmotaClient" // default user-agent used, can be changed with `wc.set_useragent()`
     #define USE_BERRY_WEBCLIENT_TIMEOUT  2000    // Default timeout in milliseconds
+    #define USE_BERRY_LEDS_PANEL                 // Add button to dynamically load the Leds Panel from a bec file online
+    #define USE_BERRY_LEDS_PANEL_URL             "http://ota.tasmota.com/tapp/leds_panel.bec"
     //#define USE_BERRY_PARTITION_WIZARD           // Add a button to dynamically load the Partion Wizard from a bec file online (+1.3KB Flash)
     #define USE_BERRY_PARTITION_WIZARD_URL      "http://ota.tasmota.com/tapp/partition_wizard.bec"
     //#define USE_BERRY_GPIOVIEWER                 // Add a button to dynamocally load the GPIO Viewer from a bec file online
@@ -1237,6 +1254,9 @@
     #define BE_LV_WIDGET_TABLE
     // #define BE_LV_WIDGET_TEXTAREA
 
+    // adding ad-hoc colorwheel from LVGL8 to LVGL9
+    #define BE_LV_WIDGET_COLORWHEEL
+
     #define BE_LV_WIDGET_ANIMIMG
     #define BE_LV_WIDGET_CHART
     #define BE_LV_WIDGET_IMGBTN       // LVGL 8
@@ -1244,6 +1264,13 @@
     // #define BE_LV_WIDGET_KEYBOARD
     #define BE_LV_WIDGET_LED
     #define BE_LV_WIDGET_LIST
+    // #define BE_LV_WIDGET_MENU
+    #ifdef BE_LV_WIDGET_MENU          // if menu is enabled, also enable sub-element classes
+      #define BE_LV_WIDGET_MENU_CONT
+      #define BE_LV_WIDGET_MENU_PAGE
+      #define BE_LV_WIDGET_MENU_SECTION
+      #define BE_LV_WIDGET_MENU_SEPARATOR
+    #endif // BE_LV_WIDGET_MENU
     #define BE_LV_WIDGET_METER
     #define BE_LV_WIDGET_MSGBOX
     #define BE_LV_WIDGET_QRCODE
@@ -1253,7 +1280,7 @@
     #define BE_LV_WIDGET_SPINNER
     #define BE_LV_WIDGET_SPANGROUP
     #define BE_LV_WIDGET_SPAN
-    // #define BE_LV_WIDGET_TABVIEW
+    #define BE_LV_WIDGET_TABVIEW
     // #define BE_LV_WIDGET_TILEVIEW
 
 // -- Matter protocol ---------------------------------
@@ -1385,6 +1412,8 @@
   #define USE_SHINE
   #define MP3_MIC_STREAM
   #define USE_I2S_AUDIO_BERRY
+  #define USE_I2S_AAC
+  #define USE_I2S_OPUS
 #endif // USE_I2S_ALL
 
 #endif  // _MY_USER_CONFIG_H_

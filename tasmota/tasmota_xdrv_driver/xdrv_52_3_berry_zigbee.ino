@@ -26,6 +26,9 @@
 #include "be_func.h"
 
 extern "C" {
+  extern const bclass be_class_zcl_attribute_list;
+  extern const bclass be_class_zcl_attribute;
+  extern const bclass be_class_zcl_attribute_ntv;
   extern const bclass be_class_zb_device;
 
   // Zigbee Device `zd`
@@ -118,7 +121,11 @@ extern "C" {
   int zc_item_or_find(struct bvm *vm, bbool raise_if_unknown) {
     int32_t top = be_top(vm); // Get the number of arguments
     if (!zigbee.active) {
-      be_raise(vm, "internal_error", "zigbee not started");
+      if (raise_if_unknown) {
+        be_raise(vm, "internal_error", "zigbee not started");
+      } else {
+        be_return_nil(vm);
+      }
     }
     if (top >= 2 && (be_isint(vm, 2) || be_isstring(vm, 2))) {
       const Z_Device & device = be_isint(vm, 2) ? zigbee_devices.findShortAddr(be_toint(vm, 2))
@@ -235,6 +242,27 @@ extern "C" {
     return ret;
   }
 
+  int zd_info(bvm *vm);
+  int zd_info(bvm *vm) {
+    if (!zigbee.active) {
+      be_raise(vm, "internal_error", "zigbee not started");
+    }
+    be_getmember(vm, 1, "_p");
+    const class Z_Device* device = (const class Z_Device*) be_tocomptr(vm, -1);
+    // call ZbInfo
+    static Z_attribute_list attr_list;
+    attr_list.reset();
+    if (device != nullptr) {
+      device->jsonDumpSingleDevice(attr_list, 3, false);   // don't add Device/Name
+      be_pushntvclass(vm, &be_class_zcl_attribute_list);
+     be_pushcomptr(vm, &attr_list);
+      be_call(vm, 1);
+      be_pop(vm, 1);
+      be_return(vm);
+    } else {
+      be_return_nil(vm);
+    }
+  }
 }
 
 /*********************************************************************************************\
@@ -346,10 +374,6 @@ extern "C" {
  *
 \*********************************************************************************************/
 extern "C" {
-  extern const bclass be_class_zcl_attribute_list;
-  extern const bclass be_class_zcl_attribute;
-  extern const bclass be_class_zcl_attribute_ntv;
-
   void zat_zcl_attribute(struct bvm *vm, const Z_attribute *attr);
 
   // Pushes the Z_attribute_list on the stack as a simple list
@@ -391,10 +415,20 @@ extern "C" {
         be_pushreal(vm, (breal)attr->val.fval);
         break;
       case Za_type::Za_raw:
-        be_pushbytes(vm, attr->val.bval->getBuffer(), attr->val.bval->len());
+        // `bval` can be `null`, avoid crashing
+        if (attr->val.bval) {
+          be_pushbytes(vm, attr->val.bval->getBuffer(), attr->val.bval->len());
+        } else {
+          be_pushbytes(vm, nullptr, 0);
+        }
         break;
       case Za_type::Za_str:
-        be_pushstring(vm, attr->val.sval);
+        // `sval` can be `null`, avoid crashing
+        if (attr->val.sval) {
+          be_pushstring(vm, attr->val.sval);
+        } else {
+          be_pushstring(vm, "");
+        }
         break;
         
       case Za_type::Za_obj:
@@ -567,38 +601,38 @@ extern "C" {
 }
 
 extern "C" {
-  int zigbee_test_attr(struct bvm *vm) {
-    int32_t mode = be_toint(vm, 2);
-    if (mode < 10) {
-      //
-    } else {
-      Z_attribute *a = new Z_attribute();
-      if (mode == 10) {
-        a->setKeyId(1111, 2222);
-        a->setUInt(1337);
-      } else if (mode == 11) {
-        a->setKeyName("super_attribute");
-        a->key_suffix = 2;
-        a->setFloat(3.14);
-      } else if (mode == 12) {
-        a->setKeyName("array");
-        a->newJsonArray();
-        a->val.arrval->add((int32_t)-1);
-        a->val.arrval->addStr("foo");
-        a->val.arrval->addStr("bar");
-        a->val.arrval->addStr("bar\"baz\'toto");
-      } else if (mode == 13) {
-        a->setKeyName("list");
-        a->newAttrList();
-        Z_attribute &subattr1 = a->val.objval->addAttribute(10,20);
-        subattr1.setStr("sub1");
-        Z_attribute &subattr2 = a->val.objval->addAttribute(11,21);
-        subattr2.setStr("sub2");
-      }
-      zat_zcl_attribute(vm, a);
-    }
-    be_return(vm);
-  }
+//   int zigbee_test_attr(struct bvm *vm) {
+//     int32_t mode = be_toint(vm, 2);
+//     if (mode < 10) {
+//       //
+//     } else {
+//       Z_attribute *a = new Z_attribute();
+//       if (mode == 10) {
+//         a->setKeyId(1111, 2222);
+//         a->setUInt(1337);
+//       } else if (mode == 11) {
+//         a->setKeyName("super_attribute");
+//         a->key_suffix = 2;
+//         a->setFloat(3.14);
+//       } else if (mode == 12) {
+//         a->setKeyName("array");
+//         a->newJsonArray();
+//         a->val.arrval->add((int32_t)-1);
+//         a->val.arrval->addStr("foo");
+//         a->val.arrval->addStr("bar");
+//         a->val.arrval->addStr("bar\"baz\'toto");
+//       } else if (mode == 13) {
+//         a->setKeyName("list");
+//         a->newAttrList();
+//         Z_attribute &subattr1 = a->val.objval->addAttribute(10,20);
+//         subattr1.setStr("sub1");
+//         Z_attribute &subattr2 = a->val.objval->addAttribute(11,21);
+//         subattr2.setStr("sub2");
+//       }
+//       zat_zcl_attribute(vm, a);
+//     }
+//     be_return(vm);
+//   }
 
 
   // Creates a zcl_attributes from Z_attribute_list
@@ -617,18 +651,18 @@ extern "C" {
     }
   }
 
-  int zigbee_test_msg(struct bvm *vm) {
-    Z_attribute_list attr_list;
+  // int zigbee_test_msg(struct bvm *vm) {
+  //   Z_attribute_list attr_list;
 
-    attr_list.lqi = 250;
-    Z_attribute &subattr1 = attr_list.addAttribute(10,20);
-    subattr1.setStr("sub1");
-    Z_attribute &subattr2 = attr_list.addAttribute(11,21);
-    subattr2.setStr("sub2");
+  //   attr_list.lqi = 250;
+  //   Z_attribute &subattr1 = attr_list.addAttribute(10,20);
+  //   subattr1.setStr("sub1");
+  //   Z_attribute &subattr2 = attr_list.addAttribute(11,21);
+  //   subattr2.setStr("sub2");
 
-    zat_zcl_attribute_list(vm, 100, &attr_list);
-    be_return(vm);
-  }
+  //   zat_zcl_attribute_list(vm, 100, &attr_list);
+  //   be_return(vm);
+  // }
 }
 
 #endif // USE_ZIGBEE

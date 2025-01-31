@@ -49,6 +49,8 @@ static int zd_member(bvm *vm) {
   be_return(vm);
 }
 
+extern int zd_info(bvm *vm);
+
 extern int zc_started(struct bvm *vm);
 extern int zc_info(struct bvm *vm);
 extern int zc_item(struct bvm *vm);
@@ -100,6 +102,8 @@ class be_class_zb_device (scope: global, name: zb_device, strings: weak) {
 
   member, func(zd_member)
 
+  info, func(zd_info)
+
   tostring, closure(class_zb_device_tostring_closure)
 }
 @const_object_info_end */
@@ -123,8 +127,8 @@ class be_class_zb_coord_ntv (scope: global, name: zb_coord_ntv, strings: weak) {
 
   abort, ctype_func(zc_abort)
 
-  test_attr, func(zigbee_test_attr)
-  test_msg, func(zigbee_test_msg)
+  // test_attr, func(zigbee_test_attr)
+  // test_msg, func(zigbee_test_msg)
 }
 @const_object_info_end */
 
