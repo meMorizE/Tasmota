@@ -11,6 +11,11 @@ if !global.dds75lbNodes      # data survive to decoder reload
 end
 
 class LwDecoDDS75LB
+  def unload()
+    global.undef("dds75lbNodes")
+    global.undef("LwDecoDDS75LB")
+  end
+
   static def decodeUplink(Name, Node, RSSI, FPort, Bytes)
     var data = {"Device":"Dragino DDS75-LB/LS"}
     
@@ -30,14 +35,14 @@ class LwDecoDDS75LB
     end
 
     ## SENSOR DATA ##
-    if 2 == FPort && 8 == Bytes.size() 
+    if 2 == FPort && 8 == Bytes.size()
       last_seen = tasmota.rtc('local')
 	  	  
-	  battery_last_seen = tasmota.rtc('local')
+      battery_last_seen = tasmota.rtc('local')
       battery = ((Bytes[0] << 8) | Bytes[1]) / 1000.0
       data.insert("BattV",battery)
       
-	  distance=Bytes[2]<<8 | Bytes[3] 
+      distance=Bytes[2]<<8 | Bytes[3] 
       data.insert("Distance",distance)
   
       valid_values = true
@@ -67,6 +72,7 @@ class LwDecoDDS75LB
   end #decodeUplink()
 
   static def add_web_sensor()
+    var fmt = global.LwSensorFormatter_cls()
     var msg = ""
     for sensor: global.dds75lbNodes
       var name = sensor[0]
@@ -78,7 +84,7 @@ class LwDecoDDS75LB
       var battery_last_seen = sensor[3]
       var battery = sensor[4]
       var rssi = sensor[5]
-      msg += lwdecode.header(name, name_tooltip, battery, battery_last_seen, rssi, last_seen)
+      msg += fmt.header(name, name_tooltip, battery, battery_last_seen, rssi, last_seen)
 
       # Sensors
       var distance = sensor[6]
@@ -90,4 +96,4 @@ class LwDecoDDS75LB
   end #add_web_sensor()
 end #class
 
-LwDeco = LwDecoDDS75LB
+global.LwDeco = LwDecoDDS75LB
