@@ -1045,6 +1045,7 @@
 #define D_SENSOR_C8_CO2_5K_TX           "C8-CO2-5K - TX"
 #define D_SENSOR_MKSKYBLU_TX            "MkSkyBlu - TX"
 #define D_SENSOR_MKSKYBLU_RX            "MkSkyBlu - RX"
+#define D_SENSOR_ADS1256_CS             "ADS1256 - CS"
 
 // Units
 #define D_UNIT_AMPERE                     "A"

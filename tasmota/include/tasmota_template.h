@@ -237,6 +237,7 @@ enum UserSelectablePins {
 #endif
   GPIO_VID6608_F, GPIO_VID6608_CW,      // VID6608
   GPIO_MKSKYBLU_TX, GPIO_MKSKYBLU_RX,   // MakeSkyBlue solar charge controller
+  GPIO_ADS1256_CS,                      // ADS1256 SPI Chip Select
   GPIO_SENSOR_END };
 
 // Error as warning to rethink GPIO usage with max 2045
@@ -516,6 +517,7 @@ const char kSensorNames[] PROGMEM =
 #endif
   D_VID6608_F "|" D_VID6608_CW "|"
   D_SENSOR_MKSKYBLU_TX "|" D_SENSOR_MKSKYBLU_RX "|"
+  D_SENSOR_ADS1256_CS "|"
 ;
 
 const char kSensorNamesFixed[] PROGMEM =
@@ -530,6 +532,7 @@ const char kSensorNamesFixed[] PROGMEM =
 #define MAX_MAX31855S            6
 #define MAX_MAX31865S            6
 #define MAX_MCP23XXX             6
+#define MAX_ADS1256              6
 #define MAX_FLOWRATEMETER        2
 #define MAX_A4988_MSS            3
 #define MAX_WEBCAM_DATA          8
@@ -675,6 +678,9 @@ const uint16_t kGpioNiceList[] PROGMEM = {
   AGPIO(GPIO_LORA_DI4),
   AGPIO(GPIO_LORA_DI5),
 #endif  // USE_SPI_LORA
+#ifdef USE_ADS1256
+  AGPIO(GPIO_ADS1256_CS) + AGMAX(MAX_ADS1256),   // ADS1256 ADC Chip Select
+#endif  // USE_ADS1256
 #endif  // USE_SPI
 
 #if defined(USE_SDCARD) && defined(ESP32)
