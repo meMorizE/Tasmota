@@ -48,24 +48,9 @@
 #define XSNS_121                        121
 
 
-typedef struct _ads1256_config_t
-{
-    float ref;          // reference voltage in V, typically 2.5V
-    bool buffer;        // true if internal buffer enabled, false if not
-    uint16_t sps;       // samples per second, e.g. 30000 for max data rate
-    uint8_t sdcs;       // Sensor Detect Current Source, 0 for off, 1 for 0.5uA, 2 for 2uA, 3 for 10uA
-    uint8_t pga;        // programmable gain amplifier setting, e.g. 1 for gain of 1, 2 for gain of 2, etc.
-} ads1256_config_t;
-
 // Example: Single ended channel sequence: AINp=AIN0...AIN7 vs. AINn=GND
-#define ADS1256_CFG_COMMON      { .ref=2.5f, .buffer=false, .sps=30000, .sdcs=0, .pga=1 }
-#define ADS1256_CFG_CHANNELS    {  0x0F, 0x1F, 0x2F, 0x3F, 0x4F, 0x5F, 0x6F, 0x7F }
 // Example: Differential channel sequence: AINp=AIN0, AIN2, AIN4, AIN63 vs. AINn=AIN1, AIN3, AIN5, AIN7
 //#define ADS1256_CHANNEL_SEQUENCE    { 0x01, 0x23, 0x45, 0x67 }
-
-
-static const ads1256_config_t ads1256_default_config = ADS1256_CFG_COMMON;
-static const uint8_t ads1256_channel_sequence[] = ADS1256_CFG_CHANNELS;
 
 
 /*
@@ -165,41 +150,51 @@ REGISTER MAP
 const struct {
     uint8_t drate; // data rate setting for the current channel, e.g. ADS1256_DRATE_1000SPS for 1000 samples per second
     uint32_t t18_ms; // settling time for the last channel change in ms, used to ensure minimum delay between channel change and next SYNC command
+    uint32_t tcal_ms; // calibration time at autocalibtaion, if configuration changed
     uint32_t ideal_fsc; // ideal full-scale calibration value for the current channel, used for reference and diagnostics
 } cTabSettlingTime[] = { // clkin is typically 7.68MHz, so t18 is typically 1ms for 30000SPS, 2ms for 15000SPS, etc.
-    { ADS1256_DRATE_30000SPS, 1, 0x44AC08 }, // 30kSPS
-    { ADS1256_DRATE_15000SPS, 1, 0x44AC08 }, // 15kSPS
-    { ADS1256_DRATE_7500SPS,  1, 0x44AC08 }, // 7.5kSPS
-    { ADS1256_DRATE_3750SPS,  1, 0x44AC08 }, // 3.75kSPS
-    { ADS1256_DRATE_2000SPS,  1, 0x494008 }, // 2kSPS
-    { ADS1256_DRATE_1000SPS,  2, 0x494008 }, // 1kSPS
-    { ADS1256_DRATE_500SPS,   3, 0x494008 }, // 500SPS
-    { ADS1256_DRATE_100SPS,  11, 0x3A99A0 }, // 100SPS
-    { ADS1256_DRATE_60SPS,   17, 0x4651F3 }, // 60SPS
-    { ADS1256_DRATE_50SPS,   21, 0x3A99A0 }, // 50SPS
-    { ADS1256_DRATE_30SPS,   34, 0x4651F3 }, // 30SPS
-    { ADS1256_DRATE_25SPS,   41, 0x3A99A0 }, // 25SPS
-    { ADS1256_DRATE_15SPS,   67, 0x4651F3 }, // 15SPS
-    { ADS1256_DRATE_10SPS,  101, 0x2EE14C }, // 10SPS
-    { ADS1256_DRATE_5SPS,   201, 0x2EE14C }, // 5SPS
-    { ADS1256_DRATE_2_5SPS, 401, 0x2EE14C } // 2.5SPS
+    { ADS1256_DRATE_30000SPS, 1,    1, 0x44AC08 }, // 30kSPS
+    { ADS1256_DRATE_15000SPS, 1,    1, 0x44AC08 }, // 15kSPS
+    { ADS1256_DRATE_7500SPS,  1,    2, 0x44AC08 }, // 7.5kSPS
+    { ADS1256_DRATE_3750SPS,  1,    2, 0x44AC08 }, // 3.75kSPS
+    { ADS1256_DRATE_2000SPS,  1,    3, 0x494008 }, // 2kSPS
+    { ADS1256_DRATE_1000SPS,  2,    4, 0x494008 }, // 1kSPS
+    { ADS1256_DRATE_500SPS,   3,    7, 0x494008 }, // 500SPS
+    { ADS1256_DRATE_100SPS,  11,   32, 0x3A99A0 }, // 100SPS
+    { ADS1256_DRATE_60SPS,   17,   51, 0x4651F3 }, // 60SPS
+    { ADS1256_DRATE_50SPS,   21,   62, 0x3A99A0 }, // 50SPS
+    { ADS1256_DRATE_30SPS,   34,  102, 0x4651F3 }, // 30SPS
+    { ADS1256_DRATE_25SPS,   41,  124, 0x3A99A0 }, // 25SPS
+    { ADS1256_DRATE_15SPS,   67,  203, 0x4651F3 }, // 15SPS
+    { ADS1256_DRATE_10SPS,  101,  308, 0x2EE14C }, // 10SPS
+    { ADS1256_DRATE_5SPS,   201,  614, 0x2EE14C }, // 5SPS
+    { ADS1256_DRATE_2_5SPS, 401, 1228, 0x2EE14C } // 2.5SPS
 };
 
+typedef struct ads1256_config_t_
+{
+    float ref_voltage;                  // Reference voltage in V, typically 2.5V
+    uint32_t channels_used;             // Number of active channels
+    uint32_t status_mux_adcon_drate[8]; // Configuration for each channel: MUX, ADCON, DRATE, and IO settings
+} ads1256_config_t;
 
 
+#define ADS1256_CONFIG   { 2.5f, 8, 0x000F0023, 0x001F0023, 0x002F0023, 0x003F0023, 0x004F0023, 0x005F0023, 0x006F0023, 0x007F0023 } // example configuration for single-ended channels AIN0...AIN7 vs. AINCOM with 10SPS data rate and gain of 1
+
+const ads1256_config_t ads1256_default_config PROGMEM = ADS1256_CONFIG;
 
 typedef struct ADS1256_DEVICE_T_
 {
     int cs_pin;                         // Pin for Chip Select (CS)
-    uint8_t channels_used;              // Number of active channel definitions (1-8)
     uint8_t actual_channel;             // Currently active channel (0-7)
-    uint32_t last_sync_time_ms;         // Timestamp of the last SYNC command in milliseconds
-    float ref_voltage;                  // Reference voltage in V, typically 2.5V
-    uint32_t status_mux_adcon_drate[8]; // Configuration for each channel: MUX, ADCON, DRATE, and IO settings
+    uint32_t busy_ms;                   // time left after the last SYNC command in milliseconds
+    //
     uint32_t ofc[8];                    // Offset calibration values for each channel
     uint32_t fsc[8];                    // Full-scale calibration values for each channel
     int32_t raw_values[8];              // Last read value from the ADC
     float scaled_values[8];             // Last read value from the ADC converted to voltage using the reference and gain settings
+    //
+    ads1256_config_t config;            // Configuration for the device
 } ADS1256_DEVICE_T;
 
 ADS1256_DEVICE_T * mpAds1256 = nullptr; // single allocation reference for all devices, indexed by CS pin number
@@ -212,25 +207,33 @@ static void Ads1256_Sync(void);
 void Ads1256_BeginSPI(uint8_t dev_idx)
 {
     SPI.beginTransaction(SPISettings(ADS1256_SCLK_FREQUENCY, MSBFIRST, SPI_MODE1)); // ADS1256 samples data on the falling edge of SCLK, so SPI mode 1 is used
-    digitalWrite(mpAds1256[dev_idx].cs_pin, LOW); // select the device by pulling its CS pin low
+    digitalWrite(Pin(GPIO_ADS1256_CS, mpAds1256[dev_idx].cs_pin), LOW); // select the device by pulling its CS pin low
 //    delay(ADS1256_MIN_DELAY_IN_OUT_ms); // t6: Minimum delay last clock edge of DIN to first clock edge of DOUT in ms
 }
 
 void Ads1256_EndSPI(uint8_t dev_idx)
 {
-    digitalWrite(mpAds1256[dev_idx].cs_pin, HIGH); // deselect the device by pulling its CS pin high
+    digitalWrite(Pin(GPIO_ADS1256_CS, mpAds1256[dev_idx].cs_pin), HIGH); // deselect the device by pulling its CS pin high
 //    delay(ADS1256_MIN_DELAY_IN_OUT_ms); // t6: Minimum delay last clock edge of DIN to first clock edge of DOUT in ms
     SPI.endTransaction();
 }
 
-uint32_t Ads1256_GetSettlingTime_ms(uint8_t drate)
+uint32_t Ads1256_GetSettlingTime_ms(uint32_t cfg_last, uint32_t cfg_new)
 {
+    uint32_t settling_time_ms = cTabSettlingTime[sizeof(cTabSettlingTime) / sizeof(cTabSettlingTime[0]) - 1].t18_ms; // default to the longest settling time
+    uint8_t drate = cfg_new & 0xFF;
     for ( uint8_t i = 0; i < sizeof(cTabSettlingTime) / sizeof(cTabSettlingTime[0]); i++ ) {
         if ( cTabSettlingTime[i].drate == drate ) {
-            return cTabSettlingTime[i].t18_ms;
+            settling_time_ms = cTabSettlingTime[i].t18_ms;
+            if (cfg_new & 0x04000000) { // autocalibration enabled, add calibration time to settling time
+                if ( (cfg_last ^ cfg_new) & 0x020007FF ) { // only add calibration time if configuration has changed, otherwise use the previously added calibration time for the same configuration
+                    settling_time_ms += cTabSettlingTime[i].tcal_ms;
+                }
+            }
+            break;
         }
     }
-    return cTabSettlingTime[sizeof(cTabSettlingTime) / sizeof(cTabSettlingTime[0]) - 1].t18_ms; // return the longest settling time if data rate not found
+    return settling_time_ms;
 }
 
 uint32_t Ads1256_GetIdealFSC(uint8_t drate)
@@ -252,20 +255,20 @@ void Ads1256_NextCycle(uint8_t dev_idx)
 
     ch = mpAds1256[dev_idx].actual_channel; // current channel index (=actual configuration and conversion)
 
-    u32 = mpAds1256[dev_idx].last_sync_time_ms - millis();
-    if ( u32 < Ads1256_GetSettlingTime_ms(mpAds1256[dev_idx].status_mux_adcon_drate[ch] & 0xFF) ) { // ensure minimum CS hold time after last SYNC
+    if ( mpAds1256[dev_idx].busy_ms >= 50 ) {
+        mpAds1256[dev_idx].busy_ms -= 50; // decrease the busy time by the cycle time
         return; // not yet time for next cycle, wait until minimum settling time has passed
     }
-
-    next_ch = (ch + 1) % mpAds1256[dev_idx].channels_used; // config: next channel index in the sequence, wraps around to 0 after the last channel
+    
+    next_ch = (ch + 1) % mpAds1256[dev_idx].config.channels_used; // next channel index in the sequence, wrap around to 0 after the last channel
 
     Ads1256_BeginSPI(dev_idx);
     SPI.transfer(ADS1256_CMD_WREG(ADS1256_REG_STATUS));
     SPI.transfer(ADS1256_CMD2_REG(4));
-    SPI.transfer((uint8_t)(mpAds1256[dev_idx].status_mux_adcon_drate[next_ch] >> 24)); // STATUS register
-    SPI.transfer((uint8_t)(mpAds1256[dev_idx].status_mux_adcon_drate[next_ch] >> 16)); // MUX register
-    SPI.transfer((uint8_t)(mpAds1256[dev_idx].status_mux_adcon_drate[next_ch] >> 8));  // ADCON register
-    SPI.transfer((uint8_t)mpAds1256[dev_idx].status_mux_adcon_drate[next_ch]);         // DRATE register
+    SPI.transfer((uint8_t)(mpAds1256[dev_idx].config.status_mux_adcon_drate[next_ch] >> 24)); // STATUS register
+    SPI.transfer((uint8_t)(mpAds1256[dev_idx].config.status_mux_adcon_drate[next_ch] >> 16)); // MUX register
+    SPI.transfer((uint8_t)(mpAds1256[dev_idx].config.status_mux_adcon_drate[next_ch] >> 8));  // ADCON register
+    SPI.transfer((uint8_t)mpAds1256[dev_idx].config.status_mux_adcon_drate[next_ch]);         // DRATE register
 /* not here. shall be init by DRATE defintion with the ideal values or determined by calibration
     SPI.transfer((uint8_t)(mpAds1256[dev_idx].ofc[next_ch] >> 16)); // OFC0 register
     SPI.transfer((uint8_t)(mpAds1256[dev_idx].ofc[next_ch] >> 8));  // OFC1 register
@@ -276,7 +279,6 @@ void Ads1256_NextCycle(uint8_t dev_idx)
     SPI.transfer((uint8_t)mpAds1256[dev_idx].fsc[next_ch]);         // FSC2 register
 */
     SPI.transfer(ADS1256_CMD_SYNC); // Send the SYNC command to all selected devices
-    mpAds1256[dev_idx].last_sync_time_ms = millis(); // Update the timestamp of the last SYNC command
     SPI.transfer(ADS1256_CMD_WAKEUP); // Send the WAKEUP command to all selected devices
     SPI.transfer(ADS1256_CMD_RDATA); // Send the RDATA command to read the conversion result
     delay(ADS1256_MIN_DELAY_COMMAND_ms); // t11: Minimum delay between the last clock edge of DOUT and the first clock edge of the next command in ms
@@ -287,9 +289,11 @@ void Ads1256_NextCycle(uint8_t dev_idx)
 
     raw_value = ((int32_t)rx[0] << 16) | ((int32_t)rx[1] << 8) | rx[2]; // Combine the three bytes into a 24-bit signed integer
     if (raw_value & 0x800000) { // If the sign bit is set, convert to negative value
-        raw_value -= 0x1000000;
+        raw_value = raw_value - 0x1000000;
     }
     mpAds1256[dev_idx].raw_values[ch] = raw_value; // Store the raw value for this channel
+    mpAds1256[dev_idx].busy_ms = 1 + Ads1256_GetSettlingTime_ms(mpAds1256[dev_idx].config.status_mux_adcon_drate[ch], 
+                                                            mpAds1256[dev_idx].config.status_mux_adcon_drate[next_ch]); // Set the busy time for the next cycle based on the current channel's configuration
     mpAds1256[dev_idx].actual_channel = next_ch; // Update the actual channel index to the next channel for the next cycle
 }
 
@@ -310,10 +314,42 @@ void Ads1256_EverySecond(void)
 }
 
 
+void Ads1256Label(char* label, uint32_t maxsize, uint32_t device) {
+    // Create the identifier of the the selected sensor
+    // "ADS1256":{"A0":3240,"A1":3235,"A2":3269,"A3":3269}
+    snprintf_P(label, maxsize, PSTR("ADS1256"));
+    // "ADS1256-1":{"A0":3240,"A1":3235,"A2":3269,"A3":3269,"A4":3269,"A5":3269,"A6":3269,"A7":3269},"ADS1256-2":{"A0":3240,"A1":3235,"A2":3269,"A3":3269}
+    snprintf_P(label, maxsize, PSTR("%s%cCS%u"), label, IndexSeparator(), mpAds1256[device].cs_pin+1);
+}
+
+
+void Ads1256Show(bool json) {
+    uint32_t i,j;
+    char label[16];
+    for ( i = 0; i < ads1256_count; i++) {
+        Ads1256Label(label, sizeof(label), i);
+        if (json) {
+            ResponseAppend_P(PSTR(",\"%s\":{"), label);
+            for (j = 0; j < mpAds1256[i].config.channels_used; j++) {
+                ResponseAppend_P(PSTR("%s\"A%d\":%d"), (0 == j) ? "" : ",", j, mpAds1256[i].raw_values[j] );
+            }
+            ResponseJsonEnd();
+        }
+#ifdef USE_WEBSERVER
+        else {
+            for (j = 0; j < mpAds1256[i].config.channels_used; j++) {
+                WSContentSend_PD(HTTP_SNS_ANALOG, label, j, mpAds1256[i].raw_values[j] );
+            }
+        }
+    }
+#endif  // USE_WEBSERVER
+}
+
+
 /********************************************************************************************/
 
 void Ads1256Init(void) {
-    int i;
+    int i, pin;
     uint32_t u32;
     ADS1256_DEVICE_T * pDevice = nullptr;
 
@@ -340,7 +376,8 @@ void Ads1256Init(void) {
     pDevice = mpAds1256; // first device
     for( i=0; i < MAX_ADS1256; i++ ) {
         if (u32 & 1u) { // if the least significant bit is set
-            pDevice->cs_pin = Pin(GPIO_ADS1256_CS, i); // assign the CS pin to the device structure
+            pDevice->cs_pin = i; // assign the CS pin to the device structure
+            pDevice->config = ads1256_default_config; // assign the default configuration to the device structure
             pDevice++; // move to the next device structure for the next configured device
         }
         u32 >>= 1; // shift the bitmask to check the next bit
@@ -360,8 +397,9 @@ void Ads1256Init(void) {
     delay(20);
     // all devices share the same SPI bus, so we can initialize them all in one go
     for( i = 0; i < ads1256_count; i++ ) {  
-        pinMode(mpAds1256[i].cs_pin, OUTPUT);
-        digitalWrite(mpAds1256[i].cs_pin, LOW); // select the device
+        pin = Pin(GPIO_ADS1256_CS, mpAds1256[i].cs_pin);
+        pinMode(pin, OUTPUT);
+        digitalWrite(pin, LOW); // select the device
         delay(2); // Wait for the CS to settle after selecting the device
 
         SPI.beginTransaction(SPISettings(ADS1256_SCLK_FREQUENCY, MSBFIRST, SPI_MODE1)); // ADS1256 samples data on the falling edge of SCLK, so SPI mode 1 is used
@@ -371,7 +409,7 @@ void Ads1256Init(void) {
         u32 = SPI.transfer(0xFF); // Read the status register value
         SPI.endTransaction();
         delay(ADS1256_MIN_CS_HOLD_TIME_ms); // Wait for action complete before deselecting the device
-        digitalWrite(mpAds1256[i].cs_pin, HIGH); // deselect the device
+        digitalWrite(pin, HIGH); // deselect the device
         if (u32 == 0xFF) {
             AddLog(LOG_LEVEL_ERROR, PSTR("ADS1256.CS%u: No response, check wiring and CS pin configuration"), i+1);
 //            mpAds1256[i].cs_pin = -1; // Mark this device as unconfigured to skip it in the future
