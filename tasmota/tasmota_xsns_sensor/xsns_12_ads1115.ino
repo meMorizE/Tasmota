@@ -48,7 +48,8 @@
 #define ADS1115_ADDRESS_ADDR_SDA        0x4A      // address pin tied to SDA pin
 #define ADS1115_ADDRESS_ADDR_SCL        0x4B      // address pin tied to SCL pin
 
-#define ADS1115_CYCLE_MS                50        // single conversion cycle time in ms: 50, 100 or 250
+#define ADS1115_DEBUG_ALERT_DRDY_PIN    1         // set to 1 to enable ALERT/RDY pin as Data Ready signal for debugging, pull-up resistor required
+
 #ifdef USE_RULES
 // +-1 percent fullscale change threshold for rules processing
 #define ADS1115_RULES_CHANGE_THRESHOLD  ((1 * (1UL << 15)) / 100)
@@ -83,6 +84,7 @@ CONFIG REGISTER
 #define ADS1115_REG_CONFIG_MUX_SINGLE_1 (0x5000)  // Single-ended AIN1
 #define ADS1115_REG_CONFIG_MUX_SINGLE_2 (0x6000)  // Single-ended AIN2
 #define ADS1115_REG_CONFIG_MUX_SINGLE_3 (0x7000)  // Single-ended AIN3
+#define ADS1115_REG_CONFIG_MUX_SINGLE(ch)   (0x4000 + (ch)*0x1000)  // Single-ended
 
 #define ADS1115_REG_CONFIG_PGA_MASK     (0x0E00)
 #define ADS1115_REG_CONFIG_PGA_6_144V   (0x0000)  // +/-6.144V range = Gain 2/3 (default)
@@ -124,53 +126,91 @@ CONFIG REGISTER
 #define ADS1115_REG_CONFIG_CQUE_4CONV   (0x0002)  // Assert ALERT/RDY after four conversions
 #define ADS1115_REG_CONFIG_CQUE_NONE    (0x0003)  // Disable the comparator and put ALERT/RDY in high state (default)
 
-const float ads1115_fullscales[] PROGMEM = { 6.144f, 4.096f, 2.048f, 1.024f, 0.512f, 0.256f };
-const uint16_t ads1115_ranges[] PROGMEM = { ADS1115_REG_CONFIG_PGA_6_144V, ADS1115_REG_CONFIG_PGA_4_096V, ADS1115_REG_CONFIG_PGA_2_048V, ADS1115_REG_CONFIG_PGA_1_024V, ADS1115_REG_CONFIG_PGA_0_512V, ADS1115_REG_CONFIG_PGA_0_256V };
-const uint8_t ads1115_addresses[] PROGMEM = { ADS1115_ADDRESS_ADDR_GND, ADS1115_ADDRESS_ADDR_VDD, ADS1115_ADDRESS_ADDR_SDA, ADS1115_ADDRESS_ADDR_SCL };
-const char ADS1115_HTTP_SNS_F_VOLT[]      PROGMEM = "{s}%s "  D_VOLTAGE             "%d {m}% 1.6f " D_UNIT_VOLT              "{e}";
-const char ADS1115_HTTP_SNS_F_MILLIVOLT[] PROGMEM = "{s}%s "  D_VOLTAGE             "%d {m}% 4.3f " D_UNIT_MILLIVOLT         "{e}";
+#define ADS1115_DEFAULT_DATARATE  ADS1115_REG_CONFIG_DR_32SPS
 
+#define ADS1115_CONFIG_A         (ADS1115_REG_CONFIG_OS_SINGLE    | \
+                                  ADS1115_REG_CONFIG_MODE_SINGLE  | \
+                                  ADS1115_REG_CONFIG_CLAT_NONLAT  | \
+                                  ADS1115_REG_CONFIG_CPOL_ACTVHI  | \
+                                  ADS1115_REG_CONFIG_CMODE_TRAD   | \
+                                  ADS1115_DEFAULT_DATARATE          ) 
+#if ADS1115_DEBUG_ALERT_DRDY_PIN == 1  
+#define ADS1115_CONFIG_COMMON     (ADS1115_CONFIG_A                | \
+                                   ADS1115_REG_CONFIG_CQUE_1CONV     )
+#else
+#define ADS1115_CONFIG_COMMON     (ADS1115_CONFIG_A                | \
+                                   ADS1115_REG_CONFIG_CQUE_NONE      )
+#endif
 
-uint8_t ads1115_count = 0;
-uint16_t ads1115_range;
-uint8_t ads1115_channels;
-uint16_t ads1115_config;
-uint8_t ads1115_units;
-float ads1115_fullscale_V = 6.144f;
+#define ADS1115_MAX_CONFIGS 4
 
+/********************************************************************************************/
+/* types */
 typedef struct 
 {
-  int16_t last_values[4] = { 0,0,0,0 };
-  uint8_t changed_bit;
+  int16_t last_values[ADS1115_MAX_CONFIGS];
+  uint16_t config[ADS1115_MAX_CONFIGS];
+  uint8_t cfg_idx;        // actual config index
   uint8_t address; 
   uint8_t bus;
+#ifdef USE_RULES
+  uint8_t changed_bit;
+#endif
 } ADS1115_t;
+
+/********************************************************************************************/
+/* ROM (const) */
+const uint8_t ads1115_addresses[] PROGMEM = { ADS1115_ADDRESS_ADDR_GND, 
+                                              ADS1115_ADDRESS_ADDR_VDD, 
+                                              ADS1115_ADDRESS_ADDR_SDA, 
+                                              ADS1115_ADDRESS_ADDR_SCL };
+
+const float ads1115_fs_factors[] PROGMEM = { (float)(6.144 / 32768.0),
+                                             (float)(4.096 / 32768.0),
+                                             (float)(2.048 / 32768.0),
+                                             (float)(1.024 / 32768.0),
+                                             (float)(0.512 / 32768.0),
+                                             (float)(0.256 / 32768.0),
+                                             (float)(0.256 / 32768.0),
+                                             (float)(0.256 / 32768.0) };
+
+const uint16_t ads1115_ranges[] PROGMEM = { ADS1115_REG_CONFIG_PGA_6_144V, 
+                                            ADS1115_REG_CONFIG_PGA_4_096V, 
+                                            ADS1115_REG_CONFIG_PGA_2_048V, 
+                                            ADS1115_REG_CONFIG_PGA_1_024V, 
+                                            ADS1115_REG_CONFIG_PGA_0_512V, 
+                                            ADS1115_REG_CONFIG_PGA_0_256V };
+
+const uint16_t ads1115_dr[] PROGMEM = { ADS1115_REG_CONFIG_DR_8SPS, 
+                                        ADS1115_REG_CONFIG_DR_16SPS, 
+                                        ADS1115_REG_CONFIG_DR_32SPS }; // we do not block, so higher data rates makes no sense with cycling of 50ms
+
+const char ADS1115_HTTP_SNS_F_VOLT[]      PROGMEM = "{s}%s "  D_VOLTAGE             "%d {m}% 1.6f " D_UNIT_VOLT              "{e}";
+const char ADS1115_HTTP_SNS_F_MILLIVOLT[] PROGMEM = "{s}%s "  D_VOLTAGE             "%d {m}% 4.3f " D_UNIT_MILLIVOLT         "{e}";
+// default configurations
+const uint16_t ADS1115_DEF_CFGS_SE[ADS1115_MAX_CONFIGS] PROGMEM = { ADS1115_REG_CONFIG_MUX_SINGLE_0 | ADS1115_CONFIG_COMMON,
+                                                                    ADS1115_REG_CONFIG_MUX_SINGLE_1 | ADS1115_CONFIG_COMMON,
+                                                                    ADS1115_REG_CONFIG_MUX_SINGLE_2 | ADS1115_CONFIG_COMMON,
+                                                                    ADS1115_REG_CONFIG_MUX_SINGLE_3 | ADS1115_CONFIG_COMMON };
+
+const uint16_t ADS1115_DEF_CFGS_DF[ADS1115_MAX_CONFIGS] PROGMEM = { ADS1115_REG_CONFIG_MUX_DIFF_0_1 | ADS1115_CONFIG_COMMON,
+                                                                    ADS1115_REG_CONFIG_MUX_DIFF_2_3 | ADS1115_CONFIG_COMMON,
+                                                                    0,
+                                                                    0};
+
+/********************************************************************************************/
+/* RAM */
+uint8_t ads1115_count = 0;
+uint8_t ads1115_units;
 ADS1115_t * Ads1115;
 
 
 /********************************************************************************************/
-void Ads1115UpdateConfig(uint8_t channel) {
-  ads1115_config =  ADS1115_REG_CONFIG_OS_SINGLE    | // Write: Set to start a single-conversion
-                    ADS1115_REG_CONFIG_MODE_SINGLE  | // Power-down single-shot mode (default)
-                    ADS1115_REG_CONFIG_CQUE_NONE    | // Comparator enabled and asserts on 1 match
-                    ADS1115_REG_CONFIG_CLAT_NONLAT  | // Non Latching mode
-                    ads1115_range                   | // ADC Input voltage range (Gain)
-                    ADS1115_REG_CONFIG_CPOL_ACTVLOW | // Alert/Rdy active low   (default val)
-                    ADS1115_REG_CONFIG_CMODE_TRAD   | // Traditional comparator (default val)
-#if ADS1115_CYCLE_MS == 50 /* 20 cycles per second */
-                    ADS1115_REG_CONFIG_DR_32SPS; // 32 samples per second
-#elif ADS1115_CYCLE_MS == 100 /* 10 cycles per second */
-                    ADS1115_REG_CONFIG_DR_16SPS; // 16 samples per second
-#elif ADS1115_CYCLE_MS == 250 /* 4 cycles per second */
-                    ADS1115_REG_CONFIG_DR_8SPS;  // 8 samples per second
-#else
-#error "Invalid ADS1115_CYCLE_MS value, only 50, 100 or 250 are possible"
-#endif
-                    // Set single-ended or differential input channel
-  if (ads1115_channels == ADS1115_SINGLE_CHANNELS) {
-    ads1115_config |= (ADS1115_REG_CONFIG_MUX_SINGLE_0 + (channel << 12));
-  } else {
-    ads1115_config |= (ADS1115_REG_CONFIG_MUX_DIFF_0_1 + (channel << 14));
+void Ads1115Config(uint32_t devices_bit, uint16_t * configs) {
+  for (uint32_t t = 0; t < ads1115_count; t++) { // for each device (they can be on different busses and convert same time)
+    if (bitRead(devices_bit, t)) {
+      memcpy(Ads1115[t].config, configs, sizeof(uint16_t) * ADS1115_MAX_CONFIGS); // update config for this device
+    }
   }
 }
 
@@ -182,7 +222,7 @@ void Ads1115Detect(void) {
   #define ADS1115_I2C_MAX_BUSES   8 /* limit to 8 busses */
 #endif
   uint32_t found_bits = 0; /* up to 4 device per bus, bit0..bit3: found device on bus0, bit4..bit7: found device on bus1 ... */
-  for (uint32_t bus = 0; bus < MAX_I2C; bus++) {
+  for (uint32_t bus = 0; bus < ADS1115_I2C_MAX_BUSES; bus++) {
 
     for (uint32_t i = 0; i < sizeof(ads1115_addresses); i++) {
       if (!I2cSetDevice(ads1115_addresses[i], bus)) { continue; }
@@ -194,7 +234,7 @@ void Ads1115Detect(void) {
       }
     }
   }
-  if( !ads1115_count ) {
+  if (!ads1115_count) {
     return; // no device found, driver not active
   }
   Ads1115 = (ADS1115_t*)malloc(sizeof(ADS1115_t) * ads1115_count);
@@ -203,19 +243,23 @@ void Ads1115Detect(void) {
 //    AddLog(LOG_LEVEL_ERROR, PSTR("ADS1115: Failed to allocate memory for %d devices"), ads1115_count);
     return;
   }
-  // Set default mode and range
-  ads1115_channels = ADS1115_SINGLE_CHANNELS;
-  ads1115_range = ADS1115_REG_CONFIG_PGA_6_144V;
-  ads1115_fullscale_V = 6.144f;
   ads1115_units = 0;
   memset(Ads1115, 0, sizeof(ADS1115_t) * ads1115_count); // init last values and changed bits
-  for (uint32_t bus = 0; bus < MAX_I2C; bus++) {
+  for (uint32_t bus = 0; bus < ADS1115_I2C_MAX_BUSES; bus++) {
     for (uint32_t i = 0; i < sizeof(ads1115_addresses); i++) {
-      if( found_bits & 1 ) {
+      if (found_bits & 1) {
+        // initialize default config
+        for( uint32_t cfg = 0; cfg < ADS1115_MAX_CONFIGS; cfg++) {
+          Ads1115[ads1115_count].config[cfg] = ADS1115_REG_CONFIG_MUX_SINGLE(cfg % 4) | ADS1115_CONFIG_COMMON | ADS1115_REG_CONFIG_PGA_6_144V;
+        }
         Ads1115[ads1115_count].address = ads1115_addresses[i];
         Ads1115[ads1115_count].bus = bus;
         I2cSetActiveFound(Ads1115[ads1115_count].address, "ADS1115", bus);
         ads1115_count++;
+#if ADS1115_DEBUG_ALERT_DRDY_PIN == 1        
+        I2cWrite16(ads1115_addresses[i], ADS1115_REG_POINTER_LOWTHRESH, 0x7FFF, bus);
+        I2cWrite16(ads1115_addresses[i], ADS1115_REG_POINTER_HITHRESH,  0x8000, bus);
+#endif
         found_bits >>= 1;
       }
     }
@@ -243,68 +287,74 @@ void Ads1115Label(char* label, uint32_t maxsize, uint32_t device) {
 
 /********************************************************************************************/
 void Ads1115Cycle(bool config_only) {
-  // cycle through channels, read conversion result of previous channel and write config for next channel
-  static uint32_t channel = ADS1115_SINGLE_CHANNELS - 1; // persistent channel index for next cycle
   uint16_t config;
   int16_t value;
+  ADS1115_t device;
 
   for (uint32_t t = 0; t < ads1115_count; t++) { // for each device (they can be on different busses and convert same time)
-    if( config_only == false) { // not only config, also read last conversion result
-      // read actual config
-      config = I2cRead16(Ads1115[t].address, ADS1115_REG_POINTER_CONFIG, Ads1115[t].bus);
-      if( config == ads1115_config ) { // only read conversion if config is as expected
-        // read conversion result
-        value = I2cRead16(Ads1115[t].address, ADS1115_REG_POINTER_CONVERT, Ads1115[t].bus);
+    device = Ads1115[t]; // optimize struct access by local copy, as it is used multiple times in this loop
+    // I2C: read actual status and config
+    config = I2cRead16(device.address, ADS1115_REG_POINTER_CONFIG, device.bus);
+    if (config & ADS1115_REG_CONFIG_OS_NOTBUSY) {
+      if (config_only == false) { // not only config, also read last conversion result
+        if (config == device.config[device.cfg_idx]) { // config is as expected
+          // I2C: read conversion result
+          value = I2cRead16(device.address, ADS1115_REG_POINTER_CONVERT, device.bus);
 #ifdef USE_RULES
-        if( _abs(value - Ads1115[t].last_values[channel]) > ADS1115_RULES_CHANGE_THRESHOLD ) {
-          bitSet(Ads1115[t].changed_bit , channel); // relevant change, set bit for this channel
-        }      
-        Ads1115[t].last_values[channel] = value; // update stored value
-        if(channel == ads1115_channels - 1) { // last channel measured, process changes
-          if (Ads1115[t].changed_bit) { // if there are changes for this device
-            char label[16];
-            Ads1115Label(label, sizeof(label), t);
-            Response_P(PSTR("{\"%s\":{"), label);
-            bool first = true;
-            for (uint32_t i = 0; i < ads1115_channels; i++) {
-              if (bitRead(Ads1115[t].changed_bit, i)) {
-                float fValue = 1.0f;
-                switch(ads1115_units) {
-                  case 2: // millivolt
-                    fValue = 1000.0f; // fallthrough
-                  case 1: // volt
-                    fValue = fValue * (ads1115_fullscale_V / 32768.0f);
-                    ResponseAppend_P(PSTR("%s\"A%ddiv10\":%f"), (first) ? "" : ",", i, (float)(Ads1115[t].last_values[i]) * fValue );
-                    break;
-                  default: // raw value
-                    ResponseAppend_P(PSTR("%s\"A%ddiv10\":%d"), (first) ? "" : ",", i, Ads1115[t].last_values[i]);
-                }
-                first = false;
-              }
-            }
-            ResponseJsonEndEnd();
-            XdrvRulesProcess(0);
-            Ads1115[t].changed_bit = 0;
-          }
-        } 
-#else
-        Ads1115[t].last_values[channel] = value; // update stored value
+          if (_abs(value - device.last_values[device.cfg_idx]) > ADS1115_RULES_CHANGE_THRESHOLD) {
+            bitSet(device.changed_bit , device.cfg_idx); // relevant change, set bit for this config index
+          }      
 #endif
-      } // else config is not as expected
-    } // else only config, no read
-    // write config for next conversion (e.g. change mux)
-    Ads1115UpdateConfig((channel + 1) % ads1115_channels);
-    I2cWrite16(Ads1115[t].address, ADS1115_REG_POINTER_CONFIG, ads1115_config, Ads1115[t].bus);
+          device.last_values[device.cfg_idx] = value; // update stored value
+        } // else config is not as expected, keep last stored value TODO: error-counter ?
+      } // else only config, no read
+      device.cfg_idx++; // next configuration
+      if (device.cfg_idx >= ADS1115_MAX_CONFIGS) {
+        device.cfg_idx = 0; // reset to first config index
+      } else {
+        if (!(device.config[device.cfg_idx] & ADS1115_REG_CONFIG_OS_SINGLE)) {
+          device.cfg_idx = 0; // reset to first config index
+        }
+      }
+      // I2C: write next config and start next conversion
+      I2cWrite16(device.address, ADS1115_REG_POINTER_CONFIG, device.config[device.cfg_idx], device.bus);
+    } // else busy, nothing to do now
+#ifdef USE_RULES
+    if (device.cfg_idx == 0) { // all configs done for this device
+      if (device.changed_bit) { // if there are changed values for this device
+        char label[16];
+        Ads1115Label(label, sizeof(label), t);
+        Response_P(PSTR("{\"%s\":{"), label);
+        bool first = true;
+        for (uint32_t i = 0; i < ADS1115_MAX_CONFIGS; i++) {
+          if (bitRead(device.changed_bit, i)) {
+            float fValue = 1.0f;
+            switch(ads1115_units) {
+              case 2: // millivolt
+                fValue = 1000.0f; // fallthrough
+              case 1: // volt
+                fValue *= (float)(device.last_values[i]) * ads1115_fs_factors[(device.config[i] >> 9) & 0x07];
+                ResponseAppend_P(PSTR("%s\"A%ddiv10\":%f"), (first) ? "" : ",", i, fValue);
+                break;
+              default: // raw value
+                ResponseAppend_P(PSTR("%s\"A%ddiv10\":%d"), (first) ? "" : ",", i, device.last_values[i]);
+            }
+            first = false;
+          }
+        }
+        ResponseJsonEndEnd();
+        XdrvRulesProcess(0);
+        device.changed_bit = 0;
+      }
+    }
+#endif
+    Ads1115[t] = device; // update device struct with new config and possibly changed bit and last values
   } // for each device
-  channel++; // cycle to next channel
-  if(channel >= ads1115_channels) { // reset to first channel
-    channel = 0;
-  }
 }
 
 /********************************************************************************************/
 void Ads1115Show(bool json) {
-
+  float fValue;
 
   for (uint32_t t = 0; t < ads1115_count; t++) {
 //    AddLog(LOG_LEVEL_INFO, "Logging ADS1115 %02x", Ads1115[t].address);
@@ -312,13 +362,13 @@ void Ads1115Show(bool json) {
     Ads1115Label(label, sizeof(label), t);
     if (json) {
       ResponseAppend_P(PSTR(",\"%s\":{"), label);
-      for (uint32_t i = 0; i < ads1115_channels; i++) {
+      for (uint32_t i = 0; i < ADS1115_MAX_CONFIGS; i++) {
         switch(ads1115_units) {
           case 2: // millivolt
             fValue = 1000.0f; // fallthrough
           case 1: // volt
-            fValue = fValue * (ads1115_fullscale_V / 32768.0f);
-            ResponseAppend_P(PSTR("%s\"A%d\":%f"), (0 == i) ? "" : ",", i, (float)(Ads1115[t].last_values[i]) * fValue );
+            fValue *= (float)((Ads1115[t].last_values[i]) * ads1115_fs_factors[(Ads1115[t].config[i] >> 9) & 0x07]);
+            ResponseAppend_P(PSTR("%s\"A%d\":%f"), (0 == i) ? "" : ",", i, fValue);
             break;
           default: // raw value
             ResponseAppend_P(PSTR("%s\"A%d\":%d"), (0 == i) ? "" : ",", i, Ads1115[t].last_values[i]);
@@ -328,12 +378,16 @@ void Ads1115Show(bool json) {
     }
 #ifdef USE_WEBSERVER
     else {
-      for (uint32_t i = 0; i < ads1115_channels; i++) {
-        if( ads1115_units == 1) { // volt
-          WSContentSend_PD(ADS1115_HTTP_SNS_F_VOLT, label, i, Ads1115[t].last_values[i] * (ads1115_fullscale_V / 32768.0f));
+      for (uint32_t i = 0; i < ADS1115_MAX_CONFIGS; i++) {
+        if (ads1115_units == 1 || ads1115_units == 2) { // volt or millivolt
+          fValue = (float)(Ads1115[t].last_values[i]) * ads1115_fs_factors[(Ads1115[t].config[i] >> 9) & 0x07];
+        }
+        if (ads1115_units == 1) { // volt
+          WSContentSend_PD(ADS1115_HTTP_SNS_F_VOLT, label, i, fValue);
         } else
-        if( ads1115_units == 2) { // millivolt
-          WSContentSend_PD(ADS1115_HTTP_SNS_F_MILLIVOLT, label, i, Ads1115[t].last_values[i] * (ads1115_fullscale_V * (1000.0f / 32768.0f)));
+        if (ads1115_units == 2) { // millivolt
+          fValue *= 1000.0f;
+          WSContentSend_PD(ADS1115_HTTP_SNS_F_MILLIVOLT, label, i, fValue);
         } else { // default raw value
           WSContentSend_PD(HTTP_SNS_ANALOG, label, i, Ads1115[t].last_values[i]);
         }
@@ -344,36 +398,63 @@ void Ads1115Show(bool json) {
 }
 
 /********************************************************************************************/
+// 'Sensor12 Dn' : Differential Channels 01 and 23 (=MUX settings), n:0...5 for range (=PGA settings)
+// 'Sensor12 Sn' : Single ended Channels 0123 (=MUX settings), n:0...5 for range (=PGA settings)
+// new:
+// 'Sensor12 Ux' : Unit selection, x: R=raw (default), V=volt, M=millivolt
+// 'Sensor12 Tn' : Data rate selection, n: 0=8SPS, 1=16SPS, 2=32SPS (default)
+// TODO 'Sensor12 Caa<bb<cc<dd>>> <dev> : Set Configuration aa=[0],bb=[1],cc=[2], dd=[3], dev=(bus * 100 + I2C address)
 bool ADS1115_Command(void) {
+  uint16_t configs[ADS1115_MAX_CONFIGS];
+  uint8_t mode;
+  uint16_t ads1115_range;
   // Sensor12 D2
   // Sensor12 S0
   if (XdrvMailbox.data_len > 1) {
     UpperCase(XdrvMailbox.data, XdrvMailbox.data);
     switch (XdrvMailbox.data[0]) {
       case 'D':
-        ads1115_channels = ADS1115_DIFFERENTIAL_CHANNELS;
+        memcpy( configs, ADS1115_DEF_CFGS_DF, sizeof(configs) );
+        mode = 0;
         break;
       case 'S':
-        ads1115_channels = ADS1115_SINGLE_CHANNELS;
+        memcpy( configs, ADS1115_DEF_CFGS_SE, sizeof(configs) );  
+        mode = 1;
+        break;
     }
     uint32_t number = atoi((const char*)XdrvMailbox.data +1);    
 
-    if(XdrvMailbox.data[0] == 'D' || XdrvMailbox.data[0] == 'S') {
+    if (XdrvMailbox.data[0] == 'D' || XdrvMailbox.data[0] == 'S') {
       if ((number >= 0) && (number <= 5)) {
         ads1115_range = ads1115_ranges[number];
-        ads1115_fullscale_V = ads1115_fullscales[number];
+        for (uint32_t i = 0; i < ADS1115_MAX_CONFIGS; i++) {
+          configs[i] |= ads1115_range;
+        }
+        Ads1115Config(0xFFFFFFFF, configs); // apply to all devices
+        const char ds[2][13] = { "Differential", "Single ended" };
+        const uint16_t r[6] = { 6144, 4096, 2048, 1024, 512, 256 };
+        Response_P("{\"ADS1115\":{\"Settings\":\"%c%u\",\"Mode\":\"%s\",\"Range\":%u,\"Unit\":\"mV\"}}",
+          XdrvMailbox.data[0], number, ds[mode], r[number]);
       }
     } else
-    if(XdrvMailbox.data[0] == 'U') { // output unit selection (HTTP, JSON and rules output)
+    if (XdrvMailbox.data[0] == 'U') { // output unit selection (HTTP, JSON and rules output)
       if ((number >= 0) && (number <= 2)) { // 0=raw[+-15bit counts], 1=Volt[V], 2=milliVolt[mV]
         ads1115_units = number;
+        Response_P("{\"ADS1115\":{\"Unit\":\"%s\"}}", (ads1115_units == 1) ? "Volt" : (ads1115_units == 2) ? "milliVolt" : "Raw");
+      }
+    } else
+    if (XdrvMailbox.data[0] == 'T') { // data rate selection
+      if ((number >= 0) && (number <= 2)) {
+        uint16_t dr = ads1115_dr[number];
+        for (uint32_t i = 0; i < ADS1115_MAX_CONFIGS; i++) {
+          configs[i] = (Ads1115[0].config[i] & ~ADS1115_REG_CONFIG_DR_MASK) | dr;
+        }
+        Ads1115Config(0xFFFFFFFF, configs); // apply to all devices
+        const uint16_t sps[8] = { 8, 16, 32};
+        Response_P("{\"ADS1115\":{\"DataRate\":%u}}", sps[number]);
       }
     }
   }
-  const char ds[2][13] = { "Differential", "Single ended" };
-  const uint16_t r[6] = { 6144, 4096, 2048, 1024, 512, 256 };
-  Response_P("{\"ADS1115\":{\"Settings\":\"%c%u\",\"Mode\":\"%s\",\"Range\":%u,\"Unit\":\"mV\"}}",
-    ds[(ads1115_channels>>1)-1][0], ads1115_range>>9, ds[(ads1115_channels>>1)-1], r[ads1115_range>>9]);
   return true;
 }
 
@@ -392,16 +473,8 @@ bool Xsns12(uint32_t function)
   }
   else if (ads1115_count) {
     switch (function) {
-#if ADS1115_CYCLE_MS == 50
       case FUNC_EVERY_50_MSECOND:
-#elif ADS1115_CYCLE_MS == 100
-      case FUNC_EVERY_100_MSECOND:
-#elif ADS1115_CYCLE_MS == 250
-      case FUNC_EVERY_250_MSECOND:
-#else
-#error "Invalid cycle time defined for ADS1115"
-#endif
-      Ads1115Cycle(false);
+        Ads1115Cycle(false);          
         break;
       case FUNC_JSON_APPEND:
         Ads1115Show(1);
