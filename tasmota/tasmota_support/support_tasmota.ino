@@ -616,10 +616,9 @@ void SetPulseTimer(uint32_t index, uint32_t time)
 
 uint32_t GetPulseTimer(uint32_t index)
 {
-  long time = TimePassedSince(TasmotaGlobal.pulse_timer[index]);
-  if (time < 0) {
-    time *= -1;
-    return (time > 11100) ? (time / 1000) + 100 : (time > 0) ? time / 100 : 0;
+  int32_t time = -TimePassedSince(TasmotaGlobal.pulse_timer[index]);
+  if (TasmotaGlobal.pulse_timer[index] && time > 0) {
+      return (time > 11100) ? (time / 1000) + 100 : time / 100;
   }
   return 0;
 }
@@ -1127,6 +1126,12 @@ void MqttPublishTeleperiodSensor(void) {
 void PerformEverySecond(void)
 {
   TasmotaGlobal.uptime++;
+
+#ifdef ESP8266
+#ifdef USE_ESP8266_DEBUG_HEAP
+  ESP_HeapUsageUpdate();
+#endif  // USE_ESP8266_DEBUG_HEAP
+#endif  // ESP8266
 
   if (POWER_CYCLE_TIME == TasmotaGlobal.uptime) {
     UpdateQuickPowerCycle(false);
