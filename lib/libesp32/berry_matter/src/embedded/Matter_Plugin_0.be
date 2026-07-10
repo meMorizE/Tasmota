@@ -95,6 +95,7 @@ class Matter_Plugin
   static var VIRTUAL = false                # set to true only for virtual devices
   static var BRIDGE = false                 # set to true only for bridged devices (ESP8266 or OpenBK)
   static var ZIGBEE = false                 # set to true only when mapped to a zigbee device
+  static var AGGREGATE = true               # list this endpoint under the Aggregator PartsList
   var update_next                           # next timestamp for update
   # Configuration of the plugin: clusters and type
   static var CLUSTERS = matter.consolidate_clusters(_class, {
@@ -113,6 +114,7 @@ class Matter_Plugin
     0x0046: 0x00,                           # ICD Management: 0x00 = no optional features (base SIT mode, no CIP/UAT/LITS)
     0x0062: 0x01,                           # Scenes Management: SceneNames (bit 0)
     0x0102: 1 + 4,                          # Window Covering: Lift (bit 0) + PA_LF (bit 2)
+    0x0201: 0x23,                           # Thermostat: HEAT + COOL + AUTO
     0x0202: 2,                              # Fan Control: Auto (bit 1)
   }
   # `CLUSTER_REVISIONS` contains revision numbers for each cluster, or `1` if not present
@@ -441,7 +443,7 @@ matter_device.events.dump()
     elif attribute == 0xFFFB            # AttributeList
       var acli = TLV.Matter_TLV_array()
       var attr_list_bytes = self.get_attribute_list_bytes(cluster)
-      var attr_list_bytes_sz = (attr_list_bytes != nil) ? size(attr_list_bytes) : 0
+      var attr_list_bytes_sz = (attr_list_bytes != nil) ? size(attr_list_bytes) / 2 : 0
       var idx = 0
       while idx < attr_list_bytes_sz
         acli.add_TLV(nil, 0x05 #-TLV.U2-#, attr_list_bytes.get(idx * 2, -2))
@@ -453,6 +455,16 @@ matter_device.events.dump()
       return el                         # return empty list
     elif attribute == 0xFFF9            # AcceptedCommandList
       var al = TLV.Matter_TLV_array()
+      if cluster == 0x0006              # On/Off
+        al.add_TLV(nil, 0x06 #-TLV.U4-#, 0x0000)    # Off
+        al.add_TLV(nil, 0x06 #-TLV.U4-#, 0x0001)    # On
+        al.add_TLV(nil, 0x06 #-TLV.U4-#, 0x0002)    # Toggle
+        if (self.FEATURE_MAPS.find(cluster, 0) & 0x01) != 0
+          al.add_TLV(nil, 0x06 #-TLV.U4-#, 0x0040)  # OffWithEffect
+          al.add_TLV(nil, 0x06 #-TLV.U4-#, 0x0041)  # OnWithRecallGlobalScene
+          al.add_TLV(nil, 0x06 #-TLV.U4-#, 0x0042)  # OnWithTimedOff
+        end
+      end
       return al                         # TODO
     elif attribute == 0xFFFC            # FeatureMap
       var featuremap = self.FEATURE_MAPS.find(cluster, 0)
