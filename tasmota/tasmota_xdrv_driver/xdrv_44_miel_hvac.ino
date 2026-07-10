@@ -1432,6 +1432,14 @@ miel_hvac_cmnd_setairdirection(void)
 	case MIEL_HVAC_SETTINGS_AIRDIRECTION_EVEN:
 	{
 		struct miel_hvac_msg_update_runstate *rs = &sc->sc_runstate_update;
+
+		/* Enable i-See airflow control first: widevane=0x80 via 0x01.
+		 * The dispatcher sends the settings (0x01) packet before the
+		 * runstate (0x41) packet, so this reaches the unit ahead of the
+		 * airdirection value below. */
+		update->flags     |= htons(MIEL_HVAC_SETTINGS_F_WIDEVANE);
+		update->widevane   = MIEL_HVAC_SETTINGS_WIDEVANE_ISEE;
+
 		rs->eight          = 0x08;
 		rs->flags         |= htons(MIEL_HVAC_RUNSTATE_F_AIRDIRECTION);
 		rs->airdirection   = e->byte;
@@ -1942,7 +1950,11 @@ miel_hvac_input_settings(struct miel_hvac_softc *sc,
 	sc->sc_settings = *d;
 
 	if (publish)
+	{
 		miel_hvac_publish_settings(sc);
+		MqttPublishSensor();
+		TasRediscover();
+	}
 }
 
 static void
@@ -2015,8 +2027,17 @@ miel_hvac_input_data(struct miel_hvac_softc *sc,
 		miel_hvac_input_sensor(sc, &sc->sc_stage, d);
 		break;
 	case MIEL_HVAC_DATA_T_OPTIONS:
-		miel_hvac_input_sensor(sc, &sc->sc_options, d);
+	{
+		bool changed = (memcmp(&sc->sc_options, d, sizeof(sc->sc_options)) != 0);
+		sc->sc_options = *d;
+		if (changed)
+		{
+			MqttPublishSensor();
+			miel_hvac_publish_settings(sc);
+			TasRediscover();
+		}
 		break;
+	}
 	default:
 		miel_hvac_data_response(sc, d);
 		break;
